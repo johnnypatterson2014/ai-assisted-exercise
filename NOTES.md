@@ -57,6 +57,10 @@ floors in ascending order, so a shortfall lands on the highest floors; report on
 - Change 1: the zone is the grouping key of the input (`Map<ZoneId, List<Availability>>`), not a column on the row.
   `Availability`, `check` and all existing tests stay untouched, and a person's rows for one zone stay one list.
 - Change 1: a zone that has staff but no units is ignored; a unit in a zone with no roster is fully uncovered.
+- Change 1: every row in every zone is validated up front (a loop, no allocation), but only zones with units are
+  bucketed, so a bad row anywhere fails the run while unused rosters cost no memory.
+- Change 1: `check` and `checkAll` share `validate`, `bucketByDay`, `assign` and `addShortFloors`; a unit is one
+  bucket of floors in `handOut`, so the single-unit report is byte-for-byte the multi-unit report for one unit.
 
 ## Change 1: 4000 units across 5 locations in 5 time zones, one nightly run
 
