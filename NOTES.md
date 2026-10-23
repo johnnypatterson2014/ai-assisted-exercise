@@ -48,4 +48,6 @@ floors in ascending order, so a shortfall lands on the highest floors; report on
 
 ## Decisions made on the way (and why)
 
--
+- A bad row (null, blank name, missing day or shift) fails the whole check with its position, rather than being
+  skipped: a roster with a hole in it is not a safe basis for a staffing answer, and the message says what to fix.
+- Per-day bucketing is name -> set of shifts, so the same person listed for both shifts counts as one flexible person.
