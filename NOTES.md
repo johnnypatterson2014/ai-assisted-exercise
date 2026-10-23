@@ -30,14 +30,21 @@
 ```java
 public enum Shift { DAY, NIGHT }                                          // DAY 07-19, NIGHT 19-07 next day
 public record Availability(String staff, DayOfWeek day, Shift shift) {}
-public record Shortfall(DayOfWeek day, Shift shift, int required, int available) {}
-public record CoverageReport(boolean fullyCovered, List<Shortfall> shortfalls) {}
+public record UncoveredShift(DayOfWeek day, Shift shift, int floor, int required, int available) {}
+public record CoverageReport(boolean fullyCovered, List<UncoveredShift> uncovered) {}
 
 public static CoverageReport check(int floors, List<Availability> availability)   // O(n) time, O(staff) space
 ```
 
 Approach: bucket distinct staff per day into day-only, night-only and both; required = floors x 2 (day) and floors x 1
-(night); fill day from day-only then flexible, night from night-only then remaining flexible; report any slot still short.
+(night); fill day from day-only then flexible, night from night-only then remaining flexible; staff are handed to
+floors in ascending order, so a shortfall lands on the highest floors; report one line per short floor.
+
+## Interviewer's answers
+
+- 5 floors (kept as a method input; the Runner defaults to 5). Schedule is one week, keyed by weekday.
+- One person works at most one shift per day, on any floor. Report expanded per floor.
+- Not asked: flexible staff go to the day shift first. Names are compared trimmed and case-insensitively.
 
 ## Decisions made on the way (and why)
 
