@@ -55,4 +55,7 @@ sumA > total - sumA; return those items ascending. Time O(n log n), space O(n) f
 
 ## Decisions made on the way (and why)
 
--
+- Plan agreed as written: greedy accepted, duplicates are distinct items, empty input gives an empty list,
+  weights below 1 and null elements are rejected, input never modified.
+- Phase 2: the class stays `public class BoxWeights` as given, with a private constructor added; the harness
+  only calls the static method.
