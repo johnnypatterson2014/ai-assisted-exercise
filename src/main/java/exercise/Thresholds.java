@@ -12,8 +12,28 @@ import java.util.Map;
  */
 public record Thresholds(Map<VitalType, Threshold> byType) {
 
+    public Thresholds {
+        if (byType == null) {
+            throw new IllegalArgumentException("thresholds byType must not be null");
+        }
+        for (VitalType type : VitalType.values()) {
+            if (byType.get(type) == null) {
+                throw new IllegalArgumentException("thresholds missing for " + type);
+            }
+        }
+        byType = Map.copyOf(byType);
+    }
+
     /** Thresholds for one vital. Must satisfy criticalLow <= abnormalLow < abnormalHigh <= criticalHigh. */
     public record Threshold(double abnormalLow, double abnormalHigh, double criticalLow, double criticalHigh) {
+        public Threshold {
+            if (!(criticalLow <= abnormalLow && abnormalLow < abnormalHigh && abnormalHigh <= criticalHigh)) {
+                throw new IllegalArgumentException(
+                        "threshold must satisfy criticalLow <= abnormalLow < abnormalHigh <= criticalHigh, got "
+                                + "abnormal [" + abnormalLow + ", " + abnormalHigh + "] critical ["
+                                + criticalLow + ", " + criticalHigh + "]");
+            }
+        }
     }
 
     /** Clinically plausible defaults for an adult: HR in bpm, SpO2 in %, temperature in degrees Celsius. */
@@ -27,7 +47,9 @@ public record Thresholds(Map<VitalType, Threshold> byType) {
 
     /** Returns a copy with the threshold for one vital replaced. */
     public Thresholds with(VitalType type, Threshold threshold) {
-        throw new UnsupportedOperationException("not implemented");
+        Map<VitalType, Threshold> copy = new EnumMap<>(byType);
+        copy.put(type, threshold);
+        return new Thresholds(copy);
     }
 
     /** The threshold for the given vital. */

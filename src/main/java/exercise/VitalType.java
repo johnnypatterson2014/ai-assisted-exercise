@@ -1,5 +1,7 @@
 package exercise;
 
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 /** The vital signs we know how to evaluate. Device feeds spell them many ways; {@link #parse} normalises. */
@@ -7,6 +9,17 @@ public enum VitalType {
     HEART_RATE,
     SPO2,
     TEMPERATURE;
+
+    /** Known labels after normalisation (upper case, letters and digits only). Add aliases here. */
+    private static final Map<String, VitalType> ALIASES = Map.ofEntries(
+            Map.entry("HR", HEART_RATE),
+            Map.entry("HEARTRATE", HEART_RATE),
+            Map.entry("PULSE", HEART_RATE),
+            Map.entry("SPO2", SPO2),
+            Map.entry("O2SAT", SPO2),
+            Map.entry("OXYGENSATURATION", SPO2),
+            Map.entry("TEMP", TEMPERATURE),
+            Map.entry("TEMPERATURE", TEMPERATURE));
 
     /**
      * Maps a device-supplied type label to a {@link VitalType}, ignoring case, spaces, hyphens and underscores.
@@ -16,6 +29,10 @@ public enum VitalType {
      * @return the matching type, or empty if the label is null, blank or unknown
      */
     public static Optional<VitalType> parse(String label) {
-        throw new UnsupportedOperationException("not implemented");
+        if (label == null) {
+            return Optional.empty();
+        }
+        String key = label.replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT);
+        return Optional.ofNullable(ALIASES.get(key));
     }
 }

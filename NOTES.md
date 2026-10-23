@@ -65,3 +65,7 @@ HR 50-120 / 40-140 bpm; SpO2 92-100 / 85-100 %; temperature 36.0-38.5 / 35.0-40.
 - A streak longer than 3 raises one warning (at the third reading), not one per extra reading. Keeps alert volume sane.
 - Input is a list of RawReading (strings, value as Object) so Jackson can map the sample JSON directly; validation
   happens in evaluate, rejects carry the input index so a caller can find the bad row.
+- Phase 3: garbled rows are detected by a private parse that throws IllegalArgumentException, caught per row and
+  turned into a RejectedReading. Readable, but exceptions cost at scale if most rows are bad; revisit in hardening.
+- Phase 3: WARNING_STREAK is a package-private constant on VitalAlerts, not part of Thresholds, since the statement
+  fixes it at three; moving it into Thresholds is a one-line change if the interviewer wants it configurable.
