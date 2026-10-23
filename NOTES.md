@@ -72,3 +72,5 @@ HR 50-120 / 40-140 bpm; SpO2 92-100 / 85-100 %; temperature 36.0-38.5 / 35.0-40.
 - Phase 4: SpO2 has no upper bound (POSITIVE_INFINITY) so sensor noise above 100 is not an alert. Timestamps
   without a zone stay rejected: guessing UTC for a clinical alert is worse than a visible reject. Raw device text
   echoed in reject reasons is capped at 40 chars. Runner ignores unknown JSON fields so extra device data is harmless.
+- Phase 5: README written above the template notes; JP.md still names sample-input.txt, the new sample is
+  src/test/resources/sample-readings.json.
