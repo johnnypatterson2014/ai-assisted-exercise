@@ -59,3 +59,8 @@ sumA > total - sumA; return those items ascending. Time O(n log n), space O(n) f
   weights below 1 and null elements are rejected, input never modified.
 - Phase 2: the class stays `public class BoxWeights` as given, with a private constructor added; the harness
   only calls the static method.
+- Phase 3: the weights are copied into an int[] and sorted ascending, then A is taken from the top end down.
+  That validates in the same pass as the copy, sorts primitives without boxing, and the slice from `start` to
+  the end is already in increasing order, so no second sort or reversal.
+- Phase 3: the result is unmodifiable. The challenge harness only reads it, and a caller cannot corrupt a
+  returned answer by accident.

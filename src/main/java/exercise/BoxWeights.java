@@ -1,12 +1,20 @@
 package exercise;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Splits item weights into two boxes A and B so that A is strictly heavier than B, A has as few items as
  * possible and, among those, the greatest total weight. The class and method names are fixed by the challenge.
  */
 public class BoxWeights {
+
+    private static final Logger LOG = LoggerFactory.getLogger(BoxWeights.class);
 
     private BoxWeights() {
     }
@@ -20,6 +28,41 @@ public class BoxWeights {
      * @throws IllegalArgumentException if {@code arr} is null, contains null, or contains a weight below 1
      */
     public static List<Integer> minimalHeaviestSetA(List<Integer> arr) {
-        throw new UnsupportedOperationException("not implemented");
+        if (arr == null) {
+            throw new IllegalArgumentException("arr must not be null");
+        }
+        // Copy into primitives: validates every element once, never touches the caller's list, and sorts
+        // without boxing. The total is a long: 100,000 weights of 100,000 overflow an int.
+        int[] weights = new int[arr.size()];
+        long total = 0;
+        for (int i = 0; i < weights.length; i++) {
+            Integer weight = arr.get(i);
+            if (weight == null) {
+                throw new IllegalArgumentException("arr must not contain null (index " + i + ")");
+            }
+            if (weight < 1) {
+                throw new IllegalArgumentException("weights must be 1 or more, got " + weight + " at index " + i);
+            }
+            weights[i] = weight;
+            total += weight;
+        }
+        Arrays.sort(weights);
+
+        // Walk down from the heaviest until A outweighs the rest. For any size k the k heaviest items have the
+        // largest possible sum, so the first size that wins is both minimal and, for that size, the heaviest.
+        long sumA = 0;
+        int start = weights.length;
+        while (start > 0 && sumA <= total - sumA) {
+            start--;
+            sumA += weights[start];
+        }
+
+        List<Integer> setA = new ArrayList<>(weights.length - start);
+        for (int i = start; i < weights.length; i++) {
+            setA.add(weights[i]);
+        }
+        LOG.info("box A takes {} of {} items, weight {} against {}", setA.size(), weights.length, sumA,
+                total - sumA);
+        return Collections.unmodifiableList(setA);
     }
 }
