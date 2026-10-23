@@ -17,4 +17,5 @@ Using STS:
   > right click on Runner.java and "run as" > "run configurations"
   
 claude skill:
-C:\Users\Johnny\.claude\skills\coding-exercise\SKILL.md
+  C:\Users\Johnny\.claude\skills\coding-exercise\SKILL.md
+  /coding-exercise
