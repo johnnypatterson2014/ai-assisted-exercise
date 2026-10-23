@@ -1,0 +1,36 @@
+# Nightly run: one section per time zone. Units: unit <location> <unit-id> = <floors>.
+# Staff lines belong to the zone section they are in and may work any unit of that zone.
+
+zone = America/Vancouver
+unit van-general   gen-1 = 2
+unit van-general   gen-2 = 1
+unit van-children  ch-1  = 1
+unit van-st-paul   sp-1  = 2
+monica: mon - fri: day
+jeff: mon, tues: day; fri, sat: night
+sue: mon - sun: day
+ravi: mon - sun: day
+lee: mon - sun: night
+ana: mon - sun: night
+kim: sat, sun: day; mon - fri: night
+
+zone = America/Edmonton
+unit edm-general   edm-1 = 1
+pat: mon - sun: day
+sam: mon - sun: day
+jo: mon - sun: night
+
+zone = America/Winnipeg
+unit wpg-general   wpg-1 = 1
+max: mon - fri: day
+
+zone = America/Toronto
+unit tor-general   tor-1 = 1
+unit tor-general   tor-2 = 1
+amy: mon - sun: day; mon - sun: night
+ben: mon - sun: day
+cal: mon - sun: day
+dee: mon - sun: night
+
+zone = America/Halifax
+unit hal-general   hal-1 = 1

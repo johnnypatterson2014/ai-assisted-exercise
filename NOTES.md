@@ -61,6 +61,11 @@ floors in ascending order, so a shortfall lands on the highest floors; report on
   bucketed, so a bad row anywhere fails the run while unused rosters cost no memory.
 - Change 1: `check` and `checkAll` share `validate`, `bucketByDay`, `assign` and `addShortFloors`; a unit is one
   bucket of floors in `handOut`, so the single-unit report is byte-for-byte the multi-unit report for one unit.
+- Change 1 hardening: floors summed over all units are capped at ten million (4000 x 500 is a fifth of it); zones
+  are validated in id order so the first error is the same on every run; the log line carries the duration.
+- Change 1 Runner: `zone = <id>` starts a section, `unit <location> <id> = <floors>` lines and staff lines belong
+  to it; a file without zone lines keeps the single-unit format and output. `sample-nightly.txt` has 5 zones.
+- Unit and location ids are case-sensitive (they are identifiers); staff names are not (they are people).
 
 ## Change 1: 4000 units across 5 locations in 5 time zones, one nightly run
 

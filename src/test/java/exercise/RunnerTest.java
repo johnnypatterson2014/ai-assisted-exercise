@@ -10,7 +10,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
+import java.time.ZoneId;
 import java.util.List;
+
+import com.fasterxml.jackson.core.type.TypeReference;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -51,6 +54,25 @@ class RunnerTest {
         }
 
         @Test
+        void zoneSectionsGiveOneReportPerUnitInZoneThenLocationThenUnitOrder() throws IOException {
+            List<UnitReport> reports = Runner.MAPPER.readValue(Runner.run(List.of(
+                    "zone = America/Vancouver",
+                    "unit van-general gen-1 = 1",
+                    "unit van-children ch-1 = 1",
+                    "d1: mon-sun: day", "d2: mon-sun: day", "d3: mon-sun: day", "n1: mon-sun: night",
+                    "",
+                    "zone: America/Toronto",
+                    "unit tor-general t-1 = 1")), new TypeReference<List<UnitReport>>() { });
+
+            assertThat(reports).extracting(UnitReport::unitId).containsExactly("t-1", "ch-1", "gen-1");
+            assertThat(reports.get(0).zone()).isEqualTo(ZoneId.of("America/Toronto"));
+            assertThat(reports.get(0).report().uncovered()).hasSize(14);
+            assertThat(reports.get(1).report().fullyCovered()).isTrue();
+            assertThat(reports.get(2).report().uncovered()).hasSize(14)
+                    .contains(new UncoveredShift(MONDAY, DAY, 1, 2, 1), new UncoveredShift(MONDAY, NIGHT, 1, 1, 0));
+        }
+
+        @Test
         void dayRangesWrapAroundTheWeekAndPrefixesAreAccepted() throws IOException {
             CoverageReport report = run("floors: 1", "ann: SATURDAY-Monday: Night", "bob: Sat - mon: night");
 
@@ -79,6 +101,29 @@ class RunnerTest {
             assertThatThrownBy(() -> Runner.run(List.of("# header", line)))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining(message);
+        }
+
+        @ParameterizedTest(name = "after a zone line, [{0}] fails with [{1}]")
+        @CsvSource(delimiter = '|', quoteCharacter = '"', value = {
+                "zone = Mars/Olympus          | line 2: unknown zone id 'Mars/Olympus'",
+                "unit gen-1 = 2               | line 2: expected 'name: days: shift'",
+                "unit van-general gen-1 = two | line 2: expected 'unit <location> <unit-id> = <floors>'",
+                "unit van-general gen-1 = 0   | unit gen-1: floors must be between 1 and 500",
+                "floors = 3                   | line 2: 'floors' is for the single-unit format"})
+        void badNightlyLinesAreReportedWithTheirLineNumber(String line, String message) {
+            assertThatThrownBy(() -> Runner.run(List.of("zone = America/Vancouver", line)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining(message);
+        }
+
+        @Test
+        void unitLinesAndStaffLinesMustBeInsideAZoneSectionWhenZonesAreUsed() {
+            assertThatThrownBy(() -> Runner.run(List.of("unit van-general gen-1 = 2")))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("line 1: unit line before the first zone line");
+            assertThatThrownBy(() -> Runner.run(List.of("ann: mon: day", "zone = America/Vancouver")))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("line 2: zone sections must come before any staff line");
         }
     }
 }

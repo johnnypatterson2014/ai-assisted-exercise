@@ -101,6 +101,62 @@ class ShiftCoverageCheckAllTest {
         }
 
         @Test
+        void aPartialNightPoolIsHandedOutAcrossUnitsOfDifferentSizes() {
+            List<Availability> rows = fullRoster(5);
+            rows.removeIf(row -> row.day() == MONDAY && row.shift() == NIGHT);
+            rows.add(new Availability("n-1", MONDAY, NIGHT));
+            rows.add(new Availability("n-2", MONDAY, NIGHT));
+
+            List<UnitReport> reports = ShiftCoverage.checkAll(pacificUnits(), pool(PACIFIC, rows));
+
+            // 2 of 5 needed: ch-1 (1 floor) takes 1, gen-1 (2 floors) takes 1, sp-1 (2 floors) gets none
+            assertThat(reports.get(0).report().fullyCovered()).isTrue();
+            assertThat(reports.get(1).report().uncovered()).containsExactly(new UncoveredShift(MONDAY, NIGHT, 2, 1, 0));
+            assertThat(reports.get(2).report().uncovered()).containsExactly(
+                    new UncoveredShift(MONDAY, NIGHT, 1, 1, 0), new UncoveredShift(MONDAY, NIGHT, 2, 1, 0));
+        }
+
+        @Test
+        void fiveZonesWithSevenLocationsAreReportedInZoneThenLocationThenUnitOrder() {
+            List<Unit> units = new ArrayList<>(pacificUnits());
+            units.add(new Unit("tor-1", TOR_GENERAL, 1));
+            units.add(new Unit("hal-1", new Location("hal-general", ZoneId.of("America/Halifax")), 1));
+            units.add(new Unit("edm-1", new Location("edm-general", ZoneId.of("America/Edmonton")), 1));
+            units.add(new Unit("wpg-1", new Location("wpg-general", ZoneId.of("America/Winnipeg")), 1));
+            Map<ZoneId, List<Availability>> pools = Map.of(
+                    PACIFIC, fullRoster(5), EASTERN, fullRoster(1), ZoneId.of("America/Halifax"), fullRoster(1));
+
+            List<UnitReport> reports = ShiftCoverage.checkAll(units, pools);
+
+            assertThat(reports).extracting(UnitReport::unitId)
+                    .containsExactly("edm-1", "hal-1", "tor-1", "ch-1", "gen-1", "sp-1", "wpg-1");
+            assertThat(reports).filteredOn(r -> !r.report().fullyCovered())
+                    .extracting(UnitReport::unitId).containsExactly("edm-1", "wpg-1");
+        }
+
+        @Test
+        void fourThousandUnitsOfFiveFloorsAcrossFiveZonesRunInWellUnderASecond() {
+            List<ZoneId> zones = List.of(PACIFIC, ZoneId.of("America/Edmonton"), ZoneId.of("America/Winnipeg"),
+                    EASTERN, ZoneId.of("America/Halifax"));
+            List<Unit> units = new ArrayList<>();
+            Map<ZoneId, List<Availability>> pools = new HashMap<>();
+            for (ZoneId zone : zones) {
+                Location location = new Location("loc-" + zone.getId(), zone);
+                for (int i = 0; i < 800; i++) {
+                    units.add(new Unit(zone.getId() + "-u" + i, location, 5));
+                }
+                pools.put(zone, fullRoster(800 * 5));
+            }
+
+            long start = System.nanoTime();
+            List<UnitReport> reports = ShiftCoverage.checkAll(units, pools);
+            long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+
+            assertThat(reports).hasSize(4000).allMatch(r -> r.report().fullyCovered());
+            assertThat(elapsedMs).isLessThan(5_000);
+        }
+
+        @Test
         void aSingleUnitGivesTheSameReportAsCheck() {
             List<Availability> rows = fullRoster(3);
             rows.remove(new Availability("day-5", MONDAY, DAY));
@@ -146,6 +202,14 @@ class ShiftCoverageCheckAllTest {
             Map<ZoneId, List<Availability>> pools = Map.of(PACIFIC, fullRoster(1), EASTERN, fullRoster(1));
 
             assertThat(ShiftCoverage.checkAll(units, pools)).allMatch(r -> r.report().fullyCovered());
+        }
+
+        @Test
+        void unitIdsDifferingOnlyInCaseAreDistinctUnits() {
+            List<Unit> units = List.of(new Unit("U-1", VAN_GENERAL, 1), new Unit("u-1", VAN_GENERAL, 1));
+
+            assertThat(ShiftCoverage.checkAll(units, pool(PACIFIC, fullRoster(2))))
+                    .extracting(UnitReport::unitId).containsExactly("U-1", "u-1");
         }
 
         @Test
@@ -219,6 +283,30 @@ class ShiftCoverageCheckAllTest {
             assertThatThrownBy(() -> ShiftCoverage.checkAll(units, Map.of()))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("location 'general' has two zones");
+        }
+
+        @Test
+        void totalFloorsAcrossAllUnitsIsCapped() {
+            Location location = new Location("big", PACIFIC);
+            List<Unit> units = new ArrayList<>();
+            for (int i = 0; i <= ShiftCoverage.MAX_TOTAL_FLOORS / ShiftCoverage.MAX_FLOORS; i++) {
+                units.add(new Unit("u-" + i, location, ShiftCoverage.MAX_FLOORS));
+            }
+
+            assertThatThrownBy(() -> ShiftCoverage.checkAll(units, Map.of()))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("total floors across units must be at most " + ShiftCoverage.MAX_TOTAL_FLOORS);
+        }
+
+        @Test
+        void badRowsInSeveralZonesAreReportedForTheLowestZoneIdFirst() {
+            Map<ZoneId, List<Availability>> pools = new HashMap<>();
+            pools.put(PACIFIC, Arrays.asList(new Availability("a", MONDAY, DAY), null));
+            pools.put(EASTERN, List.of(new Availability(" ", MONDAY, DAY)));
+
+            assertThatThrownBy(() -> ShiftCoverage.checkAll(List.of(), pools))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("zone America/Toronto row 0: staff name must not be blank");
         }
 
         @Test

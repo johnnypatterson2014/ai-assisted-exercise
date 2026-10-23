@@ -26,6 +26,9 @@ public final class ShiftCoverage {
     /** Upper bound on floors per unit: keeps the report small and the arithmetic far from overflow. */
     public static final int MAX_FLOORS = 500;
 
+    /** Upper bound on floors summed over all units of one run; 4000 units of 500 floors is a fifth of it. */
+    public static final long MAX_TOTAL_FLOORS = 10_000_000L;
+
     private static final Comparator<Unit> UNIT_ORDER =
             Comparator.comparing((Unit unit) -> unit.location().id()).thenComparing(Unit::id);
 
@@ -81,9 +84,11 @@ public final class ShiftCoverage {
      * @param units              the units to staff; must not be null, may be empty; ids unique, floors 1..{@link #MAX_FLOORS}
      * @param availabilityByZone staff availability rows per zone; must not be null; a zone absent here has no staff
      * @return one report per unit, ordered by zone id, location id, unit id
-     * @throws IllegalArgumentException if a unit, a location or a row is unusable, or a location id maps to two zones
+     * @throws IllegalArgumentException if a unit, a location or a row is unusable, a location id maps to two zones,
+     *                                  or the floors summed over all units exceed {@link #MAX_TOTAL_FLOORS}
      */
     public static List<UnitReport> checkAll(List<Unit> units, Map<ZoneId, List<Availability>> availabilityByZone) {
+        long start = System.nanoTime();
         if (units == null) {
             throw new IllegalArgumentException("units must not be null");
         }
@@ -91,16 +96,24 @@ public final class ShiftCoverage {
             throw new IllegalArgumentException("availability must not be null");
         }
         Map<ZoneId, List<Unit>> unitsByZone = validateAndGroupUnits(units);
+        long totalFloors = units.stream().mapToLong(Unit::floors).sum();
+        if (totalFloors > MAX_TOTAL_FLOORS) {
+            throw new IllegalArgumentException(
+                    "total floors across units must be at most " + MAX_TOTAL_FLOORS + ", got " + totalFloors);
+        }
+        List<ZoneId> zones = new ArrayList<>(availabilityByZone.keySet());
+        zones.sort(Comparator.nullsFirst(Comparator.comparing(ZoneId::getId)));
         int rows = 0;
-        for (Map.Entry<ZoneId, List<Availability>> entry : availabilityByZone.entrySet()) {
-            if (entry.getKey() == null) {
+        for (ZoneId zone : zones) {
+            if (zone == null) {
                 throw new IllegalArgumentException("zone must not be null");
             }
-            if (entry.getValue() == null) {
-                throw new IllegalArgumentException("zone " + entry.getKey() + ": availability must not be null");
+            List<Availability> roster = availabilityByZone.get(zone);
+            if (roster == null) {
+                throw new IllegalArgumentException("zone " + zone + ": availability must not be null");
             }
-            validateRows(entry.getValue(), "zone " + entry.getKey() + " row ");
-            rows += entry.getValue().size();
+            validateRows(roster, "zone " + zone + " row ");
+            rows += roster.size();
         }
 
         List<UnitReport> reports = new ArrayList<>(units.size());
@@ -127,8 +140,8 @@ public final class ShiftCoverage {
             }
         }
 
-        LOG.info("checked {} units in {} zones against {} availability rows: {} floor-shifts uncovered",
-                units.size(), unitsByZone.size(), rows, uncoveredTotal);
+        LOG.info("checked {} units in {} zones against {} availability rows: {} floor-shifts uncovered in {} ms",
+                units.size(), unitsByZone.size(), rows, uncoveredTotal, (System.nanoTime() - start) / 1_000_000);
         return List.copyOf(reports);
     }
 
