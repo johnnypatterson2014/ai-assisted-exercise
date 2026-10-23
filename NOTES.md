@@ -54,4 +54,6 @@ Time O(n log n) + O(conflicts); space O(n).
 
 ## Decisions made on the way (and why)
 
--
+- Interviewer confirmed all five assumptions: half-open intervals, duplicate ids rejected (second occurrence),
+  one conflict per kind, zero-length appointments invalid, pairs ordered by id.
+- Phase 2: rejects carry the appointment id as well as the index, since the id is what a scheduler would search for.
