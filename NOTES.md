@@ -82,3 +82,31 @@ sorted. Patients sorted by last name, first name, DOB. Time O(n log n) worst cas
   Same rule as across sources; the previous behaviour was inconsistent.
 - Phase 4, left as is: exceptions for bad rows, shape-only phone and email validation, no plausibility window on
   dates of birth, silent treatment of garbage updatedAt, no fuzzy matching.
+- Phase 5: README written above the template notes; the Runner sample is src/test/resources/sample-patients.json.
+
+## Coverage after phase 4 (JaCoCo 0.8.12, 114 tests, all green)
+
+Run with no pom change:
+`mvn -q org.jacoco:jacoco-maven-plugin:0.8.12:prepare-agent test org.jacoco:jacoco-maven-plugin:0.8.12:report`
+Full report: `target/site/jacoco/index.html`. The template's `Placeholder` is left out; it is not part of the solution.
+
+| Class | Lines | Branches |
+|---|---|---|
+| PatientConsolidation (incl. records) | 96 / 96 (100%) | 40 / 42 (95%) |
+| SourceSystem | 10 / 11 (91%) | 5 / 6 (83%) |
+| Runner | 11 / 23 (48%) | 2 / 6 (33%) |
+| **Total** | **117 / 130 (90.0%)** | **47 / 54 (87.0%)** |
+
+Not covered, and why (talking points, not fixed):
+
+- `PatientConsolidation` line 204: the blank-string half of the date-of-birth check. A null date is tested; the
+  one row with `""` fails on its blank first name first, so the branch is never reached.
+- `PatientConsolidation` line 237: the blank-string half of the updatedAt check. Null and garbage are tested,
+  `""` is not.
+- `SourceSystem` lines 19-20: `parse(null)`. The null-source row is caught earlier by the null-record check.
+  A one-line unit test on `SourceSystem.parse(null)` would close it.
+- `Runner.main` lines 46-59: argument check, stdin, exit codes. Only `run` is unit tested; main is exercised by
+  hand from the terminal.
+
+Takeaway: the solution class is at 100% lines and 95% branches; the gaps are blank-versus-null twins and the
+command-line shell, which is where I would add tests next if this went to production.
