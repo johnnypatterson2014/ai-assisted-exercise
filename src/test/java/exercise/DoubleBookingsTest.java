@@ -315,4 +315,90 @@ class DoubleBookingsTest {
             assertThat(result.conflicts()).hasSize(1);
         }
     }
+
+    @Nested
+    class Adversarial {
+
+        @Test
+        void idsAreCaseSensitiveSoDifferentCaseIsADifferentResource() {
+            Result result = find(List.of(
+                    appt("a1", "DR-1", "p-1", "09:00", "09:30"),
+                    appt("a2", "dr-1", "p-2", "09:00", "09:30")));
+
+            assertThat(result.conflicts()).isEmpty();
+        }
+
+        @Test
+        void whitespacePaddedIdsAreTheSameResource() {
+            Result result = find(List.of(
+                    appt("a1", " dr-1", "p-1", "09:00", "09:30"),
+                    appt("a2", "dr-1 ", "p-2", "09:00", "09:30")));
+
+            assertThat(result.conflicts()).containsExactly(
+                    new Conflict(ConflictKind.PROVIDER, "dr-1", "a1", "a2"));
+        }
+
+        @Test
+        void identicalRowTwiceIsADuplicateNotASelfConflict() {
+            RawAppointment same = appt("a1", "dr-1", "p-1", "09:00", "09:30");
+
+            Result result = find(List.of(same, same));
+
+            assertThat(result.conflicts()).isEmpty();
+            assertThat(result.rejected()).singleElement()
+                    .satisfies(rejected -> assertThat(rejected.reason()).containsIgnoringCase("duplicate"));
+        }
+
+        @Test
+        void hugeGarbageTimestampGivesAShortReason() {
+            String garbage = "x".repeat(10_000);
+
+            Result result = find(List.of(new RawAppointment("a1", "dr-1", "p-1", garbage, at("09:30"))));
+
+            assertThat(result.rejected()).singleElement()
+                    .satisfies(rejected -> assertThat(rejected.reason()).hasSizeLessThan(120));
+        }
+
+        @Test
+        void appointmentSpanningMidnightOverlapsTheNextDay() {
+            Result result = find(List.of(
+                    new RawAppointment("a1", "dr-1", "p-1", "2026-10-23T23:50:00Z", "2026-10-24T00:10:00Z"),
+                    new RawAppointment("a2", "dr-1", "p-2", "2026-10-24T00:00:00Z", "2026-10-24T00:30:00Z")));
+
+            assertThat(result.conflicts()).hasSize(1);
+        }
+
+        @Test
+        void everyoneOverlappingEveryoneReportsEveryPair() {
+            List<RawAppointment> input = new ArrayList<>();
+            for (int i = 0; i < 50; i++) {
+                input.add(appt("a%03d".formatted(i), "dr-1", "p-%d".formatted(i), "09:00", "10:00"));
+            }
+
+            Result result = find(input);
+
+            assertThat(result.conflicts()).hasSize(50 * 49 / 2);
+            assertThat(result.conflicts()).doesNotHaveDuplicates();
+        }
+
+        @Test
+        void longSlidingChainReportsExactlyTheOverlappingPairs() {
+            // 1000 thirty-minute appointments starting one minute apart: each overlaps the next 29.
+            List<RawAppointment> input = new ArrayList<>();
+            java.time.Instant base = java.time.Instant.parse("2026-10-23T00:00:00Z");
+            for (int i = 0; i < 1000; i++) {
+                java.time.Instant start = base.plusSeconds(60L * i);
+                input.add(new RawAppointment("a%04d".formatted(i), "dr-1", "p-%d".formatted(i),
+                        start.toString(), start.plusSeconds(30 * 60).toString()));
+            }
+
+            Result result = find(input);
+
+            int expected = 0;
+            for (int i = 0; i < 1000; i++) {
+                expected += Math.min(29, 999 - i);
+            }
+            assertThat(result.conflicts()).hasSize(expected);
+        }
+    }
 }

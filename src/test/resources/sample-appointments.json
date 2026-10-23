@@ -1,0 +1,6 @@
+[
+  {"id":"a1","providerId":"dr-1","patientId":"p-1","start":"2026-10-23T09:00:00Z","end":"2026-10-23T09:30:00Z","room":"3B"},
+  {"id":"a2","providerId":"dr-1","patientId":"p-2","start":"2026-10-23T09:15:00Z","end":"2026-10-23T09:45:00Z"},
+  {"id":"a3","providerId":"dr-2","patientId":"p-1","start":"2026-10-23T09:00:00Z","end":"2026-10-23T09:20:00Z"},
+  {"id":"a4","providerId":"dr-2","patientId":"p-3","start":"2026-10-23T10:00:00Z","end":"2026-10-23T09:00:00Z"}
+]

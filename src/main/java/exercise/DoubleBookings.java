@@ -100,38 +100,48 @@ public final class DoubleBookings {
         return new Result(List.copyOf(conflicts), List.copyOf(rejected));
     }
 
-    /**
-     * Sweep per resource: sort by start, keep the appointments still open (end after the current start) and
-     * pair the current one with each of them. Half-open intervals, so an appointment that ends exactly when the
-     * current one starts has already been closed.
-     */
+    /** Groups the appointments by one resource and sweeps each group. */
     private static List<Conflict> conflictsFor(ConflictKind kind, List<Appointment> appointments,
             Function<Appointment, String> resourceId) {
         Map<String, List<Appointment>> byResource = new HashMap<>();
         for (Appointment appointment : appointments) {
             byResource.computeIfAbsent(resourceId.apply(appointment), k -> new ArrayList<>()).add(appointment);
         }
-
         List<Conflict> conflicts = new ArrayList<>();
         for (Map.Entry<String, List<Appointment>> entry : byResource.entrySet()) {
-            List<Appointment> group = entry.getValue();
-            group.sort(BY_START_THEN_ID);
-            List<Appointment> open = new ArrayList<>();
-            for (Appointment current : group) {
-                open.removeIf(earlier -> !earlier.end().isAfter(current.start()));
-                for (Appointment earlier : open) {
-                    conflicts.add(conflict(kind, entry.getKey(), earlier, current));
-                }
-                open.add(current);
-            }
+            sweep(kind, entry.getKey(), entry.getValue(), conflicts);
         }
         return conflicts;
     }
 
-    private static Conflict conflict(ConflictKind kind, String resourceId, Appointment a, Appointment b) {
-        return a.id().compareTo(b.id()) <= 0
-                ? new Conflict(kind, resourceId, a.id(), b.id())
-                : new Conflict(kind, resourceId, b.id(), a.id());
+    /**
+     * Sweep for one resource: sort by start, keep the appointments still open (end after the current start)
+     * and pair the current one with each of them. Half-open intervals: an appointment that ends exactly when
+     * the current one starts is closed first, so touching appointments never pair.
+     */
+    private static void sweep(ConflictKind kind, String resourceId, List<Appointment> group, List<Conflict> out) {
+        group.sort(BY_START_THEN_ID);
+        List<Appointment> open = new ArrayList<>();
+        for (Appointment current : group) {
+            open.removeIf(earlier -> !earlier.end().isAfter(current.start()));
+            for (Appointment earlier : open) {
+                out.add(conflict(kind, resourceId, earlier, current));
+            }
+            open.add(current);
+        }
+    }
+
+    private static Conflict conflict(ConflictKind kind, String resourceId, Appointment earlier, Appointment later) {
+        return earlier.id().compareTo(later.id()) <= 0
+                ? new Conflict(kind, resourceId, earlier.id(), later.id())
+                : new Conflict(kind, resourceId, later.id(), earlier.id());
+    }
+
+    /** Longest piece of raw input text echoed in a reject reason, so garbage cannot bloat the result. */
+    private static final int MAX_ECHO = 40;
+
+    private static String echo(String raw) {
+        return raw.length() <= MAX_ECHO ? raw : raw.substring(0, MAX_ECHO) + "...";
     }
 
     /** Converts a raw row to a validated appointment, or throws IllegalArgumentException with the reason. */
@@ -164,7 +174,7 @@ public final class DoubleBookings {
         try {
             return Instant.parse(value.trim());
         } catch (DateTimeParseException e) {
-            throw new IllegalArgumentException(field + " is not ISO-8601 with a zone: " + value.trim());
+            throw new IllegalArgumentException(field + " is not ISO-8601 with a zone: " + echo(value.trim()));
         }
     }
 }

@@ -60,3 +60,8 @@ Time O(n log n) + O(conflicts); space O(n).
 - Phase 3: ids are trimmed before use, so " dr-1" and "dr-1" are the same provider; blank after trim is a reject.
 - Phase 3: the sweep keeps an "open" list and drops entries whose end is not after the current start. It is
   O(k * open) per group, which is the output size, so no worse than the pairs it has to report.
+- Phase 4: ids stay case-sensitive (pinned by a test); normalising case is a data-quality rule for the feed, not
+  for the detector. Raw text in reject reasons is capped at 40 chars. The sweep moved into its own method so the
+  half-open rule is one line to point at. Runner ignores unknown JSON fields such as "room".
+- Phase 4, left as is: exceptions for bad rows, lexicographic id order ("a10" before "a2"), no cap on the conflict
+  count, open-list pruning with removeIf (same order as the pairs it reports).
