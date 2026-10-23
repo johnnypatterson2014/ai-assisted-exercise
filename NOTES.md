@@ -65,3 +65,4 @@ Time O(n log n) + O(conflicts); space O(n).
   half-open rule is one line to point at. Runner ignores unknown JSON fields such as "room".
 - Phase 4, left as is: exceptions for bad rows, lexicographic id order ("a10" before "a2"), no cap on the conflict
   count, open-list pruning with removeIf (same order as the pairs it reports).
+- Phase 5: README written above the template notes; the Runner sample is src/test/resources/sample-appointments.json.
