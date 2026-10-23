@@ -148,3 +148,30 @@ Not covered, and why:
 
 Takeaway: every line runs; the three missed branches are two null guards and one exhausted loop, each one test away and
 left as talking points.
+
+## Coverage after change 1, phase 4 (JaCoCo 0.8.12, 82 tests, all green)
+
+Same command and report path as above. The 4000-unit smoke test ran in 127 ms (420 000 rows, 5 zones).
+
+| Class | Lines covered | Branches covered |
+|---|---|---|
+| `ShiftCoverage` (with `Assigned`) | 145 / 146 | 74 / 78 |
+| `Runner` (`run`, `Parser` and the parse helpers) | 87 / 87 | 47 / 49 |
+| `Shift` | 7 / 7 | n/a |
+| Records: `Availability`, `UncoveredShift`, `CoverageReport`, `Unit`, `Location`, `UnitReport` | 6 / 6 | n/a |
+| **Total** | **245 / 246** | **121 / 127** |
+
+`Placeholder` is the template's example and is left out; `Runner.main` is run by hand from the terminal and is never counted.
+
+Not covered, and why:
+
+- `ShiftCoverage.java:158`: the `unit.id() == null` half of the blank-id guard; the test uses a blank string. Closed by
+  `checkAll(List.of(new Unit(null, VAN_GENERAL, 1)), Map.of())` expecting "unit 0: id must not be blank".
+- `ShiftCoverage.java:165-166`: a null or blank location id is never given. Closed by a unit with
+  `new Location(" ", PACIFIC)` expecting "unit gen-1: location id must not be blank".
+- `ShiftCoverage.java:201`: the `row.staff() == null` guard, as before.
+- `Runner.java:81`: the `raw == null` guard for a null line, as before.
+- `Runner.java:196`: the weekday loop running out without a match, as before ("xyz" as a day).
+
+Takeaway: the change added 127 covered lines and one new gap (a blank location id); the one missed line and six
+missed branches are all null-or-blank guards and one exhausted loop, each one test away.
