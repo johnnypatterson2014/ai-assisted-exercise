@@ -57,3 +57,6 @@ Time O(n log n) + O(conflicts); space O(n).
 - Interviewer confirmed all five assumptions: half-open intervals, duplicate ids rejected (second occurrence),
   one conflict per kind, zero-length appointments invalid, pairs ordered by id.
 - Phase 2: rejects carry the appointment id as well as the index, since the id is what a scheduler would search for.
+- Phase 3: ids are trimmed before use, so " dr-1" and "dr-1" are the same provider; blank after trim is a reject.
+- Phase 3: the sweep keeps an "open" list and drops entries whose end is not after the current start. It is
+  O(k * open) per group, which is the output size, so no worse than the pairs it has to report.
