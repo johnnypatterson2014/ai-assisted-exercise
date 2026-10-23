@@ -55,6 +55,55 @@ floors in ascending order, so a shortfall lands on the highest floors; report on
 - Runner reads the problem statement's own shape (`name: days: shift; days: shift`, `floors = N`) rather than JSON,
   so a modified input can be typed by hand during the exercise; every parse error names its line.
 
+## Change 1: 4000 units across 5 locations in 5 time zones, one nightly run
+
+### The change in my words
+
+- The input is no longer one unit: 4000 units, each with its own floor count, in 7 hospital locations.
+- There are 5 time zones: 3 locations share the first zone, the other 4 zones have one location each.
+- Day shift is still 07:00-19:00 *local* and night 19:00-07:00 local, so the week is the zone's local week.
+- Staff give their availability per time zone, and can work any unit in that zone, across its locations.
+  So the pool is shared per zone and a shortfall must be placed on some location and unit in that zone.
+- One nightly batch produces the report for every unit; the output is per unit, per floor, as before.
+
+### Assumptions to confirm (ask these)
+
+1. Confirmed: availability is per zone; the pool is per zone, across its locations. One shift per local day per zone.
+   Not asked: if one person lists two zones, their rows may overlap in real time; I count them in each zone as given.
+2. When a zone's pool is short, which unit is reported short? I will fill locations, then units, in id order.
+3. Is the floor count per unit an input (a list of units)? Can a unit have zero floors (closed) or appear twice?
+4. The nightly run: the report is for the coming local week of each zone? One run after the last zone's midnight,
+   or one run per zone? Where does the report go (file per location, a table)?
+
+### Edge cases (delta only)
+
+- Null or empty: no units, a zone with units but no staff, a zone with staff but no units (rows ignored or rejected?),
+  a location with no units.
+- Invalid: duplicate unit ids, the same location id with two different zones, zero or negative floors, an unknown
+  zone id, a null zone on a row.
+- Ordering and time: report ordered by zone id, location id, unit id, then as before; DST change days make a local
+  day shift 11 or 13 hours (head count unchanged); Sunday night in one zone is already Monday in another, so the run
+  must not cut a week at a single instant.
+- Boundaries: one unit in a zone; 3 locations in one zone sharing one pool; 4000 x 14 = 56 000 floor-shift groups.
+- Scale: rows are still one pass; demand per (zone, day, shift) is a sum over its units; memory is per person per day
+  per zone, not per unit. The 5 zones are independent checks that can run in parallel in the nightly job.
+
+### Data model and public method (delta)
+
+```java
+public record Location(String id, ZoneId zone) {}
+public record Unit(String id, Location location, int floors) {}
+public record Availability(String staff, ZoneId zone, DayOfWeek day, Shift shift) {}      // zone added
+public record UnitReport(ZoneId zone, String location, String unitId, CoverageReport report) {}
+
+public static List<UnitReport> checkAll(List<Unit> units, List<Availability> availability)   // O(rows + units x 14)
+```
+
+Approach: group units by zone; per zone, demand per (day, shift) is the sum of floors x staffPerFloor over its units;
+bucket people per (zone, day) as before; the same greedy fill; then hand the assigned head count to units in
+(location id, unit id) order and to floors within each unit, reusing `addShortFloors`. The one-unit `check` stays
+as a thin wrapper over the same code. The zone is carried on the report so "Friday night" names a local week.
+
 ## Coverage after phase 4 (JaCoCo 0.8.12, 49 tests, all green)
 
 Command (no pom change; output under `target/`, which is ignored):
