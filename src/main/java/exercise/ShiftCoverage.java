@@ -122,12 +122,12 @@ public final class ShiftCoverage {
             List<Unit> zoneUnits = zone.getValue();
             Map<DayOfWeek, Map<String, EnumSet<Shift>>> people =
                     bucketByDay(availabilityByZone.getOrDefault(zone.getKey(), List.of()));
-            int totalFloors = zoneUnits.stream().mapToInt(Unit::floors).sum();
+            int zoneFloors = zoneUnits.stream().mapToInt(Unit::floors).sum();
 
             Map<Unit, List<UncoveredShift>> uncoveredByUnit = new LinkedHashMap<>();
             zoneUnits.forEach(unit -> uncoveredByUnit.put(unit, new ArrayList<>()));
             for (DayOfWeek day : DayOfWeek.values()) {
-                Assigned assigned = assign(people.getOrDefault(day, Map.of()), totalFloors);
+                Assigned assigned = assign(people.getOrDefault(day, Map.of()), zoneFloors);
                 handOut(uncoveredByUnit, day, Shift.DAY, assigned.day());
                 handOut(uncoveredByUnit, day, Shift.NIGHT, assigned.night());
             }
