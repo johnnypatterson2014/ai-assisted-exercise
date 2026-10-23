@@ -70,3 +70,7 @@ sorted. Patients sorted by last name, first name, DOB. Time O(n log n) worst cas
   caller can see it was seen and not lost.
 - Phone normalised to ten NANP digits (a leading 1 is dropped); anything else is invalid. Email trimmed and
   lower-cased; must look like local@domain.tld.
+- Phase 3: two comparators make the precedence rule explicit in code: FOR_IDENTITY (trust, then recency) picks
+  the record that gives the name and date of birth; FOR_CONTACT (recency, then trust) orders the records that
+  phone and email are taken from. Both end with the input index so the order is total and the result stable.
+- Phase 3: duplicates by (source, MRN) are resolved with FOR_CONTACT too, so the newest wins there as well.
