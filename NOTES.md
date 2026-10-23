@@ -64,3 +64,14 @@ sumA > total - sumA; return those items ascending. Time O(n log n), space O(n) f
   the end is already in increasing order, so no second sort or reversal.
 - Phase 3: the result is unmodifiable. The challenge harness only reads it, and a caller cannot corrupt a
   returned answer by accident.
+- Phase 4: the validation pass iterates the list instead of calling get(i), so a LinkedList input stays
+  O(n log n); a 100,000-item LinkedList test with a two-second timeout pins it. `start` renamed `firstOfA`.
+- Phase 4: a brute-force oracle over all subsets checks 300 random inputs of up to ten items against the greedy.
+  That is the test that would catch a wrong greedy; the samples alone would not.
+- Phase 4: Runner speaks the challenge's stdin format (count, then one weight per line) and prints one weight
+  per line, so its output can be diffed against the sample output. Jackson is unused here and left in the pom.
+- Phase 4, test failure: my review claimed box B is never empty for two or more items. False: [1, 1] needs
+  both items in A. The property holds from three items up (the two heaviest of three positive weights beat
+  the lightest), and the test now says so. The implementation was right; the reviewer was not.
+- Phase 4, left as is: constraint limits (n and weight at most 100,000) are not enforced, since long sums make
+  larger values safe; dual-pivot quicksort rather than a counting sort; validation stops at the first bad element.

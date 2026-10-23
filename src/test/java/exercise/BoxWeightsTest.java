@@ -3,15 +3,21 @@ package exercise;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class BoxWeightsTest {
@@ -136,5 +142,99 @@ class BoxWeightsTest {
                     .isThrownBy(() -> setA(3, weight, 5))
                     .withMessageContaining("1");
         }
+    }
+
+    @Nested
+    class Adversarial {
+
+        @Test
+        @Timeout(value = 2, unit = TimeUnit.SECONDS)
+        void linkedListInputIsStillLinearithmic() {
+            List<Integer> input = new LinkedList<>();
+            Random random = new Random(7);
+            for (int i = 0; i < 100_000; i++) {
+                input.add(1 + random.nextInt(100_000));
+            }
+
+            List<Integer> result = BoxWeights.minimalHeaviestSetA(input);
+
+            assertThat(result).isNotEmpty().isSorted();
+        }
+
+        @Test
+        void weightsAboveTheConstraintDoNotOverflowTheTotal() {
+            assertThat(setA(Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE))
+                    .containsExactly(Integer.MAX_VALUE, Integer.MAX_VALUE);
+        }
+
+        @Test
+        void allButOneItemCanBeNeeded() {
+            assertThat(setA(1, 1, 1, 1, 1, 1)).containsExactly(1, 1, 1, 1);
+        }
+
+        @ParameterizedTest
+        @MethodSource("exercise.BoxWeightsTest#inputsWithAtLeastThreeItems")
+        void boxBIsNeverEmptyWhenThereAreThreeOrMoreItems(List<Integer> input) {
+            // With two items B can be empty ([1, 1] needs both); from three up the two heaviest always beat the lightest.
+            assertThat(BoxWeights.minimalHeaviestSetA(input)).hasSizeLessThan(input.size());
+        }
+
+        @Test
+        void returnedListCannotBeModified() {
+            List<Integer> result = setA(3, 7, 5, 6, 2);
+
+            assertThatThrownBy(() -> result.add(1)).isInstanceOf(UnsupportedOperationException.class);
+        }
+
+        @Test
+        void matchesBruteForceOnRandomSmallInputs() {
+            Random random = new Random(2026);
+            for (int round = 0; round < 300; round++) {
+                int n = 1 + random.nextInt(10);
+                List<Integer> input = new ArrayList<>();
+                for (int i = 0; i < n; i++) {
+                    input.add(1 + random.nextInt(6));
+                }
+
+                assertThat(BoxWeights.minimalHeaviestSetA(input))
+                        .as("input %s", input)
+                        .isEqualTo(bruteForce(input));
+            }
+        }
+    }
+
+    static List<List<Integer>> inputsWithAtLeastThreeItems() {
+        return List.of(List.of(1, 1, 1), List.of(1, 1, 100), List.of(2, 2, 2, 2),
+                List.of(1, 1, 1, 1, 1, 1), List.of(5, 3, 2, 4, 1, 2));
+    }
+
+    /** Every subset: smallest size whose sum beats the rest, then heaviest, ascending. Only for n <= 10. */
+    private static List<Integer> bruteForce(List<Integer> input) {
+        int n = input.size();
+        long total = input.stream().mapToLong(Integer::longValue).sum();
+        List<Integer> best = null;
+        long bestSum = -1;
+        for (int mask = 1; mask < (1 << n); mask++) {
+            List<Integer> subset = new ArrayList<>();
+            long sum = 0;
+            for (int i = 0; i < n; i++) {
+                if ((mask & (1 << i)) != 0) {
+                    subset.add(input.get(i));
+                    sum += input.get(i);
+                }
+            }
+            if (sum <= total - sum) {
+                continue;
+            }
+            boolean better = best == null
+                    || subset.size() < best.size()
+                    || (subset.size() == best.size() && sum > bestSum);
+            if (better) {
+                Collections.sort(subset);
+                best = subset;
+                bestSum = sum;
+            }
+        }
+        return best == null ? List.of() : best;
     }
 }

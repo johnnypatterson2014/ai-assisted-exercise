@@ -4,33 +4,23 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import java.util.stream.Collectors;
 
 /**
- * Command-line entry point for trying the solution against ad hoc inputs during the exercise
- * ("run your solution against modified inputs"), without writing a new unit test each time.
+ * Command-line entry point in the challenge's custom-testing format: the first line is {@code n}, then one
+ * weight per line. Prints subset A one weight per line. Blank lines, surrounding spaces and Windows line
+ * endings are tolerated.
  *
- * Usage (Maven supplies the dependency classpath; a plain {@code java -cp target/classes} would miss Jackson
- * and SLF4J):
+ * Usage (Maven supplies the dependency classpath):
  * <pre>
- *   mvn -q compile exec:java -Dexec.args="src/test/resources/sample-input.txt"
- *   echo "one line" | mvn -q compile exec:java -Dexec.args="-"
+ *   mvn -q compile exec:java -Dexec.args="src/test/resources/sample-case-0.txt"
+ *   printf "5\n4\n2\n5\n1\n6\n" | mvn -q compile exec:java -Dexec.args="-"
  * </pre>
  * In STS: right-click Runner, Run As, Java Application, with the file path under Run Configurations, Arguments.
- *
- * Replace the body of {@link #run(List)} when the real exercise is known: parse the lines (text, CSV or JSON)
- * into the input type and call the solution. {@link #MAPPER} is ready for JSON with java.time types.
  */
 public final class Runner {
-
-    static final ObjectMapper MAPPER = new ObjectMapper()
-            .registerModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            .enable(SerializationFeature.INDENT_OUTPUT);
 
     private Runner() {
     }
@@ -43,12 +33,44 @@ public final class Runner {
         List<String> lines = "-".equals(args[0])
                 ? new String(System.in.readAllBytes(), StandardCharsets.UTF_8).lines().toList()
                 : Files.readAllLines(Path.of(args[0]), StandardCharsets.UTF_8);
-        System.out.println(run(lines));
+        try {
+            System.out.println(run(lines));
+        } catch (IllegalArgumentException e) {
+            System.err.println("bad input: " + e.getMessage());
+            System.exit(1);
+        }
     }
 
-    /** Runs the solution on raw input lines and renders the result as JSON. */
-    static String run(List<String> lines) throws IOException {
-        Placeholder.Summary summary = Placeholder.summarize(lines);
-        return MAPPER.writeValueAsString(summary);
+    /**
+     * Parses the challenge format (count, then that many weights, one per line) and renders subset A one
+     * weight per line. Empty input gives an empty string.
+     *
+     * @throws IllegalArgumentException if a line is not an integer or the count does not match the weights
+     */
+    static String run(List<String> lines) {
+        List<String> tokens = lines.stream().map(String::strip).filter(s -> !s.isEmpty()).toList();
+        if (tokens.isEmpty()) {
+            return "";
+        }
+        int count = parseInt(tokens.get(0), 1);
+        if (tokens.size() - 1 != count) {
+            throw new IllegalArgumentException(
+                    "expected " + count + " weights after the count, got " + (tokens.size() - 1));
+        }
+        List<Integer> weights = new ArrayList<>(count);
+        for (int i = 1; i < tokens.size(); i++) {
+            weights.add(parseInt(tokens.get(i), i + 1));
+        }
+        return BoxWeights.minimalHeaviestSetA(weights).stream()
+                .map(String::valueOf)
+                .collect(Collectors.joining("\n"));
+    }
+
+    private static int parseInt(String token, int line) {
+        try {
+            return Integer.parseInt(token);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("line " + line + " is not an integer: " + token);
+        }
     }
 }

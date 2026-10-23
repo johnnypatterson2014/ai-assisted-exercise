@@ -24,7 +24,7 @@ public class BoxWeights {
      * and among such subsets the heaviest, in increasing order.
      *
      * @param arr the item weights, each 1 or more; must not be null and must not contain null
-     * @return A's weights in increasing order; empty if {@code arr} is empty
+     * @return A's weights in increasing order, unmodifiable; empty only when {@code arr} is empty
      * @throws IllegalArgumentException if {@code arr} is null, contains null, or contains a weight below 1
      */
     public static List<Integer> minimalHeaviestSetA(List<Integer> arr) {
@@ -35,15 +35,15 @@ public class BoxWeights {
         // without boxing. The total is a long: 100,000 weights of 100,000 overflow an int.
         int[] weights = new int[arr.size()];
         long total = 0;
-        for (int i = 0; i < weights.length; i++) {
-            Integer weight = arr.get(i);
+        int i = 0;
+        for (Integer weight : arr) {   // iterate, not get(i): a LinkedList would make get(i) O(n) each
             if (weight == null) {
                 throw new IllegalArgumentException("arr must not contain null (index " + i + ")");
             }
             if (weight < 1) {
                 throw new IllegalArgumentException("weights must be 1 or more, got " + weight + " at index " + i);
             }
-            weights[i] = weight;
+            weights[i++] = weight;
             total += weight;
         }
         Arrays.sort(weights);
@@ -51,15 +51,15 @@ public class BoxWeights {
         // Walk down from the heaviest until A outweighs the rest. For any size k the k heaviest items have the
         // largest possible sum, so the first size that wins is both minimal and, for that size, the heaviest.
         long sumA = 0;
-        int start = weights.length;
-        while (start > 0 && sumA <= total - sumA) {
-            start--;
-            sumA += weights[start];
+        int firstOfA = weights.length;
+        while (firstOfA > 0 && sumA <= total - sumA) {
+            firstOfA--;
+            sumA += weights[firstOfA];
         }
 
-        List<Integer> setA = new ArrayList<>(weights.length - start);
-        for (int i = start; i < weights.length; i++) {
-            setA.add(weights[i]);
+        List<Integer> setA = new ArrayList<>(weights.length - firstOfA);
+        for (int j = firstOfA; j < weights.length; j++) {
+            setA.add(weights[j]);
         }
         LOG.info("box A takes {} of {} items, weight {} against {}", setA.size(), weights.length, sumA,
                 total - sumA);
