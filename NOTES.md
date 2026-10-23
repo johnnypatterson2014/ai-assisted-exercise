@@ -69,3 +69,6 @@ HR 50-120 / 40-140 bpm; SpO2 92-100 / 85-100 %; temperature 36.0-38.5 / 35.0-40.
   turned into a RejectedReading. Readable, but exceptions cost at scale if most rows are bad; revisit in hardening.
 - Phase 3: WARNING_STREAK is a package-private constant on VitalAlerts, not part of Thresholds, since the statement
   fixes it at three; moving it into Thresholds is a one-line change if the interviewer wants it configurable.
+- Phase 4: SpO2 has no upper bound (POSITIVE_INFINITY) so sensor noise above 100 is not an alert. Timestamps
+  without a zone stay rejected: guessing UTC for a clinical alert is worse than a visible reject. Raw device text
+  echoed in reject reasons is capped at 40 chars. Runner ignores unknown JSON fields so extra device data is harmless.

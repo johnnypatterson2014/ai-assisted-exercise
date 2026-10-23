@@ -36,11 +36,14 @@ public record Thresholds(Map<VitalType, Threshold> byType) {
         }
     }
 
-    /** Clinically plausible defaults for an adult: HR in bpm, SpO2 in %, temperature in degrees Celsius. */
+    /**
+     * Clinically plausible defaults for an adult: HR in bpm, SpO2 in %, temperature in degrees Celsius.
+     * SpO2 has no upper bound: a sensor reporting slightly above 100 is noise, not a dangerous patient.
+     */
     public static Thresholds defaults() {
         Map<VitalType, Threshold> map = new EnumMap<>(VitalType.class);
         map.put(VitalType.HEART_RATE, new Threshold(50, 120, 40, 140));
-        map.put(VitalType.SPO2, new Threshold(92, 100, 85, 100));
+        map.put(VitalType.SPO2, new Threshold(92, Double.POSITIVE_INFINITY, 85, Double.POSITIVE_INFINITY));
         map.put(VitalType.TEMPERATURE, new Threshold(36.0, 38.5, 35.0, 40.0));
         return new Thresholds(map);
     }

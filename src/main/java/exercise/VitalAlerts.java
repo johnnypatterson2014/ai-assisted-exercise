@@ -113,22 +113,30 @@ public final class VitalAlerts {
     private static List<Alert> alertsFor(List<Reading> readings, Threshold threshold) {
         List<Alert> alerts = new ArrayList<>();
         int streak = 0;
-        for (Reading r : readings) {
-            double v = r.value();
-            boolean critical = v < threshold.criticalLow() || v > threshold.criticalHigh();
-            boolean abnormal = v < threshold.abnormalLow() || v > threshold.abnormalHigh();
+        for (Reading reading : readings) {
+            double value = reading.value();
+            boolean critical = value < threshold.criticalLow() || value > threshold.criticalHigh();
+            boolean abnormal = value < threshold.abnormalLow() || value > threshold.abnormalHigh();
             if (critical) {
-                alerts.add(new Alert(Severity.CRITICAL, r.patientId(), r.type(), r.timestamp(),
+                alerts.add(new Alert(Severity.CRITICAL, reading.patientId(), reading.type(), reading.timestamp(),
                         "%s %s outside critical range [%s, %s]".formatted(
-                                r.type(), v, threshold.criticalLow(), threshold.criticalHigh())));
+                                reading.type(), value, threshold.criticalLow(), threshold.criticalHigh())));
             }
             streak = abnormal ? streak + 1 : 0;
             if (streak == WARNING_STREAK) {
-                alerts.add(new Alert(Severity.WARNING, r.patientId(), r.type(), r.timestamp(),
-                        "%d consecutive abnormal %s readings".formatted(WARNING_STREAK, r.type())));
+                alerts.add(new Alert(Severity.WARNING, reading.patientId(), reading.type(), reading.timestamp(),
+                        "%d consecutive abnormal %s readings".formatted(WARNING_STREAK, reading.type())));
             }
         }
         return alerts;
+    }
+
+    /** Longest piece of raw device text echoed in a reject reason, so garbage cannot bloat the result. */
+    private static final int MAX_ECHO = 40;
+
+    private static String echo(Object raw) {
+        String text = String.valueOf(raw);
+        return text.length() <= MAX_ECHO ? text : text.substring(0, MAX_ECHO) + "...";
     }
 
     /** Converts a raw row to a validated reading, or throws IllegalArgumentException with the reason. */
@@ -140,7 +148,7 @@ public final class VitalAlerts {
             throw new IllegalArgumentException("patient id is missing");
         }
         VitalType type = VitalType.parse(raw.type())
-                .orElseThrow(() -> new IllegalArgumentException("unknown vital type: " + raw.type()));
+                .orElseThrow(() -> new IllegalArgumentException("unknown vital type: " + echo(raw.type())));
         double value = parseValue(raw.value());
         if (raw.timestamp() == null || raw.timestamp().isBlank()) {
             throw new IllegalArgumentException("timestamp is missing");
@@ -149,7 +157,7 @@ public final class VitalAlerts {
         try {
             timestamp = Instant.parse(raw.timestamp().trim());
         } catch (DateTimeParseException e) {
-            throw new IllegalArgumentException("timestamp is not ISO-8601: " + raw.timestamp());
+            throw new IllegalArgumentException("timestamp is not ISO-8601 with a zone: " + echo(raw.timestamp()));
         }
         return new Reading(raw.patientId().trim(), type, value, timestamp);
     }
@@ -162,7 +170,7 @@ public final class VitalAlerts {
             try {
                 parsed = Double.parseDouble(s.trim());
             } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("value is not a number: " + s);
+                throw new IllegalArgumentException("value is not a number: " + echo(s));
             }
         } else if (value == null) {
             throw new IllegalArgumentException("value is missing");

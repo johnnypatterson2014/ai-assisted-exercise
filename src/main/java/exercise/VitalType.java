@@ -3,6 +3,7 @@ package exercise;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /** The vital signs we know how to evaluate. Device feeds spell them many ways; {@link #parse} normalises. */
 public enum VitalType {
@@ -21,6 +22,8 @@ public enum VitalType {
             Map.entry("TEMP", TEMPERATURE),
             Map.entry("TEMPERATURE", TEMPERATURE));
 
+    private static final Pattern NOT_ALPHANUMERIC = Pattern.compile("[^A-Za-z0-9]");
+
     /**
      * Maps a device-supplied type label to a {@link VitalType}, ignoring case, spaces, hyphens and underscores.
      * Accepts e.g. "HR", "hr", "Heart-Rate", "heart_rate", "SPO2", "SpO2", "oxygen saturation", "TEMP", "temperature".
@@ -32,7 +35,7 @@ public enum VitalType {
         if (label == null) {
             return Optional.empty();
         }
-        String key = label.replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT);
+        String key = NOT_ALPHANUMERIC.matcher(label).replaceAll("").toUpperCase(Locale.ROOT);
         return Optional.ofNullable(ALIASES.get(key));
     }
 }

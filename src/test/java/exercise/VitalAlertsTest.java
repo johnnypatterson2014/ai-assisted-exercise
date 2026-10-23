@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import exercise.Thresholds.Threshold;
@@ -320,5 +321,81 @@ class VitalAlertsTest {
             assertThatIllegalArgumentException()
                     .isThrownBy(() -> new Thresholds(Map.of()));
         }
+    }
+
+    @Nested
+    class Adversarial {
+
+        @ParameterizedTest
+        @MethodSource("exercise.VitalAlertsTest#unsupportedValues")
+        void unsupportedValueTypesAreRejectedNotCrashed(Object value) {
+            Result result = evaluate(List.of(reading("p-1", "HR", value, "2026-10-23T10:00:00Z")));
+
+            assertThat(result.alerts()).isEmpty();
+            assertThat(result.rejected()).singleElement()
+                    .satisfies(rejected -> assertThat(rejected.reason()).contains("value"));
+        }
+
+        @Test
+        void timestampWithAnOffsetIsAcceptedAndNormalisedToUtc() {
+            Result result = evaluate(List.of(reading("p-1", "HR", 150, "2026-10-23T12:00:00+02:00")));
+
+            assertThat(result.alerts()).singleElement()
+                    .satisfies(alert -> assertThat(alert.at()).isEqualTo(Instant.parse("2026-10-23T10:00:00Z")));
+        }
+
+        @Test
+        void timestampWithoutAZoneIsRejected() {
+            Result result = evaluate(List.of(reading("p-1", "HR", 150, "2026-10-23T10:00:00")));
+
+            assertThat(result.alerts()).isEmpty();
+            assertThat(result.rejected()).singleElement()
+                    .satisfies(rejected -> assertThat(rejected.reason()).contains("timestamp"));
+        }
+
+        @Test
+        void hugeGarbageValueGivesAShortReason() {
+            String garbage = "x".repeat(10_000);
+
+            Result result = evaluate(List.of(reading("p-1", "HR", garbage, "2026-10-23T10:00:00Z")));
+
+            assertThat(result.rejected()).singleElement()
+                    .satisfies(rejected -> assertThat(rejected.reason()).hasSizeLessThan(120));
+        }
+
+        @Test
+        void whitespacePaddedPatientIdsAreTheSamePatient() {
+            List<RawReading> input = List.of(
+                    reading("p-1", "HR", 125, "2026-10-23T10:00:00Z"),
+                    reading(" p-1 ", "HR", 128, "2026-10-23T10:01:00Z"),
+                    reading("p-1 ", "HR", 130, "2026-10-23T10:02:00Z"));
+
+            assertThat(evaluate(input).alerts()).extracting(Alert::patientId, Alert::severity)
+                    .containsExactly(tuple("p-1", Severity.WARNING));
+        }
+
+        @Test
+        void spo2SlightlyAbove100IsSensorNoiseNotAnAlert() {
+            assertThat(evaluate(series("p-1", "SPO2", 100.5, 100.5, 100.5)).alerts()).isEmpty();
+        }
+
+        @Test
+        void resultDoesNotDependOnArrivalOrder() {
+            List<RawReading> input = new ArrayList<>();
+            for (int patient = 0; patient < 20; patient++) {
+                input.addAll(series("p-" + patient, "HR", 125, 150, 70, 128, 130, 135));
+                input.addAll(series("p-" + patient, "TEMP", 39.5, 41.0, 36.5));
+            }
+            Result expected = evaluate(input);
+
+            List<RawReading> shuffled = new ArrayList<>(input);
+            java.util.Collections.shuffle(shuffled, new java.util.Random(42));
+
+            assertThat(evaluate(shuffled).alerts()).isEqualTo(expected.alerts());
+        }
+    }
+
+    static java.util.stream.Stream<Object> unsupportedValues() {
+        return java.util.stream.Stream.of(Boolean.TRUE, Map.of("v", 120), List.of(120), new Object());
     }
 }

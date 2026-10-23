@@ -1,0 +1,8 @@
+[
+  {"patientId":"p-1","type":"HR","value":125,"timestamp":"2026-10-23T10:10:00Z"},
+  {"patientId":"p-1","type":"hr","value":130,"timestamp":"2026-10-23T10:00:00Z"},
+  {"patientId":"p-1","type":"Heart-Rate","value":128,"timestamp":"2026-10-23T10:05:00Z","unit":"bpm"},
+  {"patientId":"p-2","type":"SPO2","value":82,"timestamp":"2026-10-23T10:00:00Z"},
+  {"patientId":"p-2","type":"SPO2","value":"n/a","timestamp":"2026-10-23T10:01:00Z"},
+  {"patientId":"p-3","type":"BP","value":120,"timestamp":"2026-10-23T10:00:00Z"}
+]
