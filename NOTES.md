@@ -75,3 +75,25 @@ sumA > total - sumA; return those items ascending. Time O(n log n), space O(n) f
   the lightest), and the test now says so. The implementation was right; the reviewer was not.
 - Phase 4, left as is: constraint limits (n and weight at most 100,000) are not enforced, since long sums make
   larger values safe; dual-pivot quicksort rather than a counting sort; validation stops at the first bad element.
+- Phase 5: README written above the template notes; the Runner sample is src/test/resources/sample-case-0.txt.
+
+## Coverage after phase 4 (JaCoCo 0.8.12, 146 tests, all green)
+
+Run with no pom change:
+`mvn -q org.jacoco:jacoco-maven-plugin:0.8.12:prepare-agent test org.jacoco:jacoco-maven-plugin:0.8.12:report`
+Full report: `target/site/jacoco/index.html`. The template's `Placeholder` is left out; it is not part of the solution.
+
+| Class | Lines | Branches |
+|---|---|---|
+| BoxWeights | 26 / 26 (100%) | 14 / 14 (100%) |
+| Runner | 16 / 28 (57%) | 8 / 12 (67%) |
+| **Total** | **42 / 54 (77.8%)** | **22 / 26 (84.6%)** |
+
+Not covered, and why (talking points, not fixed):
+
+- `Runner.main` lines 29-42: argument check, file versus stdin, the error exit. Only `run` is unit tested;
+  main is exercised by hand from the terminal against sample-case-0.txt. A test that spawns the JVM, or a
+  refactor that passes streams into a testable method, would close it.
+
+Takeaway: the solution class is fully covered, including both validation messages and the empty-input path;
+the only gap is the command-line shell, which a process-level test would cover before production.
