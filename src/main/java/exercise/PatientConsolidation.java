@@ -1,5 +1,6 @@
 package exercise;
 
+import java.text.Normalizer;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -17,8 +18,9 @@ import org.slf4j.LoggerFactory;
 /**
  * Consolidates demographic records from several source systems into one record per patient.
  * <p>
- * Identity: two records are the same patient when their trimmed, whitespace-collapsed, case-folded first name
- * and last name and their date of birth are equal. No fuzzy matching.
+ * Identity: two records are the same patient when their first name, last name and date of birth are equal after
+ * trimming, collapsing whitespace, folding case, stripping diacritics and normalising apostrophes. No fuzzy
+ * matching.
  * <p>
  * Precedence: name and date of birth come from the most trusted source ({@link SourceSystem} order, ties by
  * newest); phone and email each come from the newest record that has a valid value (ties by trust). A record
@@ -34,6 +36,10 @@ public final class PatientConsolidation {
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
     private static final Pattern NOT_DIGIT = Pattern.compile("\\D");
     private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    private static final Pattern COMBINING_MARKS = Pattern.compile("\\p{M}+");
+
+    /** Longest piece of raw input text echoed in a reject reason, so garbage cannot bloat the result. */
+    private static final int MAX_ECHO = 40;
 
     /** Newest first; a record without a usable updatedAt ranks last. */
     private static final Comparator<Normalised> NEWEST_FIRST =
@@ -105,13 +111,14 @@ public final class PatientConsolidation {
             }
         }
 
-        // 2. One record per (source, MRN): the newest is used, the others are reported as superseded.
+        // 2. One identity per (source, MRN): the newest decides which patient the versions belong to; older
+        //    versions are reported as superseded but their valid contact details still take part in the merge.
         Map<MatchKey, List<Normalised>> byPatient = new LinkedHashMap<>();
-        for (List<Normalised> sameSource : bySource.values()) {
-            sameSource.sort(FOR_CONTACT);
-            Normalised kept = sameSource.get(0);
-            byPatient.computeIfAbsent(kept.matchKey(), k -> new ArrayList<>()).add(kept);
-            for (Normalised older : sameSource.subList(1, sameSource.size())) {
+        for (List<Normalised> versions : bySource.values()) {
+            versions.sort(FOR_CONTACT);
+            Normalised newest = versions.get(0);
+            byPatient.computeIfAbsent(newest.matchKey(), k -> new ArrayList<>()).addAll(versions);
+            for (Normalised older : versions.subList(1, versions.size())) {
                 rejected.add(new RejectedRecord(older.index(),
                         "superseded by a newer record with the same source system and MRN"));
             }
@@ -141,8 +148,20 @@ public final class PatientConsolidation {
         }
 
         MatchKey matchKey() {
-            return new MatchKey(lastName.toLowerCase(Locale.ROOT), firstName.toLowerCase(Locale.ROOT), dateOfBirth);
+            return new MatchKey(fold(lastName), fold(firstName), dateOfBirth);
         }
+    }
+
+    /** Case, diacritics and apostrophe variants are spelling, not identity: "Zoë O’Brien" folds to "zoe o'brien". */
+    static String fold(String name) {
+        String decomposed = Normalizer.normalize(name, Normalizer.Form.NFD);
+        return COMBINING_MARKS.matcher(decomposed).replaceAll("")
+                .replace('’', '\'')
+                .toLowerCase(Locale.ROOT);
+    }
+
+    private static String echo(String raw) {
+        return raw.length() <= MAX_ECHO ? raw : raw.substring(0, MAX_ECHO) + "...";
     }
 
     /** The identity rule: case-folded names plus date of birth. */
@@ -154,7 +173,7 @@ public final class PatientConsolidation {
         List<Normalised> byRecency = group.stream().sorted(FOR_CONTACT).toList();
         String phone = byRecency.stream().map(Normalised::phone).filter(p -> p != null).findFirst().orElse(null);
         String email = byRecency.stream().map(Normalised::email).filter(e -> e != null).findFirst().orElse(null);
-        List<SourceRef> sources = group.stream().map(Normalised::sourceRef).sorted(SOURCE_ORDER).toList();
+        List<SourceRef> sources = group.stream().map(Normalised::sourceRef).distinct().sorted(SOURCE_ORDER).toList();
         return new Patient(identity.firstName(), identity.lastName(), identity.dateOfBirth(), phone, email, sources);
     }
 
@@ -188,7 +207,7 @@ public final class PatientConsolidation {
         try {
             return LocalDate.parse(value.trim());
         } catch (DateTimeParseException e) {
-            throw new IllegalArgumentException("date of birth is not yyyy-MM-dd: " + value.trim());
+            throw new IllegalArgumentException("date of birth is not yyyy-MM-dd: " + echo(value.trim()));
         }
     }
 

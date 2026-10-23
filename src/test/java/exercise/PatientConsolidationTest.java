@@ -355,4 +355,76 @@ class PatientConsolidationTest {
             assertThat(result.rejected()).hasSize(1);
         }
     }
+
+    @Nested
+    class Adversarial {
+
+        @Test
+        void supersededDuplicateStillContributesItsValidContactDetails() {
+            Result result = consolidate(List.of(
+                    jane("EHR", "E1", null, "jane@example.com", JAN),
+                    jane("EHR", "E1", "604-555-0202", null, FEB)));
+
+            Patient patient = onlyPatient(result);
+            assertThat(patient.phone()).isEqualTo("6045550202");
+            assertThat(patient.email()).isEqualTo("jane@example.com");
+            assertThat(patient.sources()).containsExactly(new SourceRef(SourceSystem.EHR, "E1"));
+            assertThat(result.rejected()).extracting(RejectedRecord::index).containsExactly(0);
+        }
+
+        @Test
+        void diacriticsDoNotSplitAPatient() {
+            Result result = consolidate(List.of(
+                    rec("EHR", "E1", "Zoë", "Müller", "1990-01-01", null, null, JAN),
+                    rec("LAB", "L1", "Zoe", "Muller", "1990-01-01", null, null, FEB)));
+
+            Patient patient = onlyPatient(result);
+            assertThat(patient.sources()).hasSize(2);
+            assertThat(patient.firstName()).isEqualTo("Zoë");
+        }
+
+        @Test
+        void typographicApostropheMatchesTheAsciiOne() {
+            Result result = consolidate(List.of(
+                    rec("EHR", "E1", "Pat", "O'Brien", "1990-01-01", null, null, JAN),
+                    rec("CRM", "C1", "Pat", "O’Brien", "1990-01-01", null, null, FEB)));
+
+            assertThat(onlyPatient(result).sources()).hasSize(2);
+        }
+
+        @Test
+        void hugeGarbageDateOfBirthGivesAShortReason() {
+            String garbage = "x".repeat(10_000);
+
+            Result result = consolidate(List.of(rec("EHR", "E1", "Jane", "Doe", garbage, null, null, JAN)));
+
+            assertThat(result.rejected()).singleElement()
+                    .satisfies(rejected -> assertThat(rejected.reason()).hasSizeLessThan(120));
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"+44 20 7946 0958", "604-555-01", "604-555-01011", "2-604-555-0101", "abc"})
+        void phoneThatIsNotTenNanpDigitsIsDroppedNotTruncated(String phone) {
+            Result result = consolidate(List.of(jane("EHR", "E1", phone, null, JAN)));
+
+            assertThat(onlyPatient(result).phone()).isNull();
+        }
+
+        @Test
+        void whitespacePaddedMrnIsTheSameSourceRecord() {
+            Result result = consolidate(List.of(
+                    jane("EHR", " E1 ", null, null, JAN),
+                    jane("EHR", "E1", null, null, FEB)));
+
+            assertThat(onlyPatient(result).sources()).containsExactly(new SourceRef(SourceSystem.EHR, "E1"));
+            assertThat(result.rejected()).hasSize(1);
+        }
+
+        @Test
+        void emailPlusTagIsKeptAndDomainIsLowerCased() {
+            Result result = consolidate(List.of(jane("EHR", "E1", null, "Jane+lab@EXAMPLE.com", JAN)));
+
+            assertThat(onlyPatient(result).email()).isEqualTo("jane+lab@example.com");
+        }
+    }
 }

@@ -74,3 +74,11 @@ sorted. Patients sorted by last name, first name, DOB. Time O(n log n) worst cas
   the record that gives the name and date of birth; FOR_CONTACT (recency, then trust) orders the records that
   phone and email are taken from. Both end with the input index so the order is total and the result stable.
 - Phase 3: duplicates by (source, MRN) are resolved with FOR_CONTACT too, so the newest wins there as well.
+- Phase 4: the match key now also strips diacritics (NFD, drop combining marks) and folds the typographic
+  apostrophe, so "Zoë Müller" and "Zoe Muller" are one patient. "Mueller" still is not: transliteration is a
+  follow-up with a table, not a rule.
+- Phase 4: older versions of the same (source, MRN) are still reported as superseded, but their valid contact
+  details now take part in the merge, so a newer version with a null email no longer erases an older valid one.
+  Same rule as across sources; the previous behaviour was inconsistent.
+- Phase 4, left as is: exceptions for bad rows, shape-only phone and email validation, no plausibility window on
+  dates of birth, silent treatment of garbage updatedAt, no fuzzy matching.

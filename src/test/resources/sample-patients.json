@@ -1,0 +1,8 @@
+[
+  {"sourceSystem":"EHR","mrn":"E100","firstName":"Jane","lastName":"Doe","dateOfBirth":"1980-05-01",
+   "phone":"(604) 555-0101","email":null,"updatedAt":"2026-01-01T00:00:00Z","gender":"F"},
+  {"sourceSystem":"LAB","mrn":"L7","firstName":" JANE","lastName":"doe ","dateOfBirth":"1980-05-01",
+   "phone":null,"email":"Jane.Doe@Example.com","updatedAt":"2026-02-01T00:00:00Z"},
+  {"sourceSystem":"CRM","mrn":"C1","firstName":"Jane","lastName":"","dateOfBirth":"05/01/1980",
+   "phone":"555","email":"not-an-email","updatedAt":null}
+]
