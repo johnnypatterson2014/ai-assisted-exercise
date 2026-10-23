@@ -54,6 +54,9 @@ floors in ascending order, so a shortfall lands on the highest floors; report on
 - Hardening: floors capped at 500 (overflow and report size), rows read through an iterator (LinkedList-safe).
 - Runner reads the problem statement's own shape (`name: days: shift; days: shift`, `floors = N`) rather than JSON,
   so a modified input can be typed by hand during the exercise; every parse error names its line.
+- Change 1: the zone is the grouping key of the input (`Map<ZoneId, List<Availability>>`), not a column on the row.
+  `Availability`, `check` and all existing tests stay untouched, and a person's rows for one zone stay one list.
+- Change 1: a zone that has staff but no units is ignored; a unit in a zone with no roster is fully uncovered.
 
 ## Change 1: 4000 units across 5 locations in 5 time zones, one nightly run
 
@@ -93,10 +96,10 @@ floors in ascending order, so a shortfall lands on the highest floors; report on
 ```java
 public record Location(String id, ZoneId zone) {}
 public record Unit(String id, Location location, int floors) {}
-public record Availability(String staff, ZoneId zone, DayOfWeek day, Shift shift) {}      // zone added
 public record UnitReport(ZoneId zone, String location, String unitId, CoverageReport report) {}
+// Availability is unchanged; the zone is the key of the input map (see decisions)
 
-public static List<UnitReport> checkAll(List<Unit> units, List<Availability> availability)   // O(rows + units x 14)
+public static List<UnitReport> checkAll(List<Unit> units, Map<ZoneId, List<Availability>> availabilityByZone)
 ```
 
 Approach: group units by zone; per zone, demand per (day, shift) is the sum of floors x staffPerFloor over its units;

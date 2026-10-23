@@ -1,6 +1,7 @@
 package exercise;
 
 import java.time.DayOfWeek;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.EnumSet;
@@ -76,6 +77,23 @@ public final class ShiftCoverage {
         LOG.info("checked {} floors against {} availability rows: {} of {} floor-shifts uncovered",
                 floors, availability.size(), uncovered.size(), floors * DayOfWeek.values().length * Shift.values().length);
         return new CoverageReport(uncovered.isEmpty(), List.copyOf(uncovered));
+    }
+
+    /**
+     * Checks coverage of every unit in every location for one nightly run.
+     * <p>
+     * Staff give availability per time zone and may work any unit in any location of that zone, so each zone has
+     * one shared pool. Within a zone, assigned staff are handed to units in (location id, unit id) order, then to
+     * floors as in {@link #check}; a shortfall lands on the last units of the last location. Availability for a zone
+     * with no units is ignored.
+     *
+     * @param units              the units to staff; must not be null, may be empty; ids unique, floors 1..{@link #MAX_FLOORS}
+     * @param availabilityByZone staff availability rows per zone; must not be null; a zone absent here has no staff
+     * @return one report per unit, ordered by zone id, location id, unit id
+     * @throws IllegalArgumentException if a unit, a location or a row is unusable, or a location id maps to two zones
+     */
+    public static List<UnitReport> checkAll(List<Unit> units, Map<ZoneId, List<Availability>> availabilityByZone) {
+        throw new UnsupportedOperationException("not implemented");
     }
 
     private static void validate(Availability row, int index) {
