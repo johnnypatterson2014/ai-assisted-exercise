@@ -57,4 +57,16 @@ sorted. Patients sorted by last name, first name, DOB. Time O(n log n) worst cas
 
 ## Decisions made on the way (and why)
 
--
+- Interviewer answers not available; proceeding on the assumptions above, made concrete as:
+  identity = exact match on trimmed, whitespace-collapsed, case-folded first + last name + ISO date of birth.
+  Date of birth must be yyyy-MM-dd; "05/01/1980" is rejected, because guessing day/month order on a field used
+  for identity is worse than a visible reject. Invalid phone or email drops the field and keeps the record.
+- Name and date of birth come from the most trusted source (EHR > LAB > CRM, ties by newest): the EHR is the
+  system of record for demographics. Phone and email come from the newest record with a valid value (ties by
+  trust): contact details change often, so recency wins there.
+- Missing or unparseable updatedAt does not reject the record; it ranks last. Unknown source system or blank
+  MRN rejects, since the record cannot be traced back.
+- Same (source, MRN) twice: the newer is used, the older is reported as rejected with reason "superseded", so a
+  caller can see it was seen and not lost.
+- Phone normalised to ten NANP digits (a leading 1 is dropped); anything else is invalid. Email trimmed and
+  lower-cased; must look like local@domain.tld.
