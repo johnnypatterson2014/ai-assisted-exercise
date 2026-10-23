@@ -74,3 +74,29 @@ HR 50-120 / 40-140 bpm; SpO2 92-100 / 85-100 %; temperature 36.0-38.5 / 35.0-40.
   echoed in reject reasons is capped at 40 chars. Runner ignores unknown JSON fields so extra device data is harmless.
 - Phase 5: README written above the template notes; JP.md still names sample-input.txt, the new sample is
   src/test/resources/sample-readings.json.
+
+## Coverage after phase 4 (JaCoCo 0.8.12, 64 tests, all green)
+
+Run with no pom change:
+`mvn -q org.jacoco:jacoco-maven-plugin:0.8.12:prepare-agent test org.jacoco:jacoco-maven-plugin:0.8.12:report`
+Full report: `target/site/jacoco/index.html`. The template's `Placeholder` is left out; it is not part of the solution.
+
+| Class | Lines | Branches |
+|---|---|---|
+| VitalAlerts (incl. records) | 83 / 83 (100%) | 45 / 46 (98%) |
+| VitalType | 18 / 18 (100%) | 2 / 2 (100%) |
+| Thresholds (incl. Threshold) | 20 / 21 (95%) | 10 / 12 (83%) |
+| Runner | 11 / 23 (48%) | 2 / 6 (33%) |
+| **Total** | **132 / 145 (91.0%)** | **59 / 66 (89.4%)** |
+
+Not covered, and why (talking points, not fixed):
+
+- `VitalAlerts` line 153: the blank-string half of the timestamp check. Tests cover a null timestamp, not `""`.
+- `Thresholds` lines 16-17: `new Thresholds(null)`. Tests cover an empty map, not null.
+- `Thresholds` line 30: the range check has four conditions; tests hit two of them (critical low above abnormal
+  low, abnormal low above abnormal high). Abnormal high above critical high is untested.
+- `Runner.main` lines 45-58: argument check, stdin, exit codes. Only `run` is unit tested; main is exercised by
+  hand from the terminal.
+
+Takeaway: the solution class is at 100% lines and 98% branches; the gaps are in the command-line shell and
+in validation of configuration, which is where I would add tests next if this went to production.
