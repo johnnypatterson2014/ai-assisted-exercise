@@ -54,3 +54,36 @@ floors in ascending order, so a shortfall lands on the highest floors; report on
 - Hardening: floors capped at 500 (overflow and report size), rows read through an iterator (LinkedList-safe).
 - Runner reads the problem statement's own shape (`name: days: shift; days: shift`, `floors = N`) rather than JSON,
   so a modified input can be typed by hand during the exercise; every parse error names its line.
+
+## Coverage after phase 4 (JaCoCo 0.8.12, 49 tests, all green)
+
+Command (no pom change; output under `target/`, which is ignored):
+
+```
+mvn -q org.jacoco:jacoco-maven-plugin:0.8.12:prepare-agent test org.jacoco:jacoco-maven-plugin:0.8.12:report
+```
+
+Report: `target/site/jacoco/index.html` (per-class HTML under `target/site/jacoco/exercise/`).
+
+| Class | Lines covered | Branches covered |
+|---|---|---|
+| `ShiftCoverage` | 51 / 51 | 29 / 30 |
+| `Runner` (`run` and its parse helpers) | 57 / 57 | 33 / 35 |
+| `Shift` | 7 / 7 | n/a |
+| Records: `Availability`, `UncoveredShift`, `CoverageReport` | 3 / 3 | n/a |
+| **Total** | **118 / 118** | **62 / 65** |
+
+`Placeholder` is the template's example and is left out; `Runner.main` is run by hand from the terminal (file and stdin
+handling, `System.exit`) and is never counted.
+
+Not covered, and why:
+
+- `ShiftCoverage.java:85`: the `row.staff() == null` half of the blank-name guard. The tests use empty and whitespace
+  names, never a null one. Closed by `check(1, List.of(new Availability(null, MONDAY, DAY)))` expecting "row 0: staff name".
+- `Runner.java:64`: the `raw == null` guard for a null line in the list. `Files.readAllLines` never yields one. Closed by
+  `Runner.run(Arrays.asList("floors = 1", null))` expecting it to be skipped like a blank line.
+- `Runner.java:135`: the weekday loop running out without a match. The bad-day test uses "mo", which fails the length
+  check before the loop. Closed by a line `monica: xyz: day` expecting "unknown day 'xyz'".
+
+Takeaway: every line runs; the three missed branches are two null guards and one exhausted loop, each one test away and
+left as talking points.
