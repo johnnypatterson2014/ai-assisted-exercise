@@ -1,3 +1,6 @@
-first line of sample input
+# Roster from the problem statement. One person per line: name: days: shift; days: shift
+# Days are mon..sun (any prefix), ranges like mon-fri; shift is day or night.
+floors = 5
 
-third line, after a blank one
+monica: mon - fri: day shift
+jeff: mon, tues: day shift; fri, sat: night shift

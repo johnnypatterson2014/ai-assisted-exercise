@@ -15,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.DayOfWeek;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
@@ -175,6 +176,34 @@ class ShiftCoverageTest {
         }
 
         @Test
+        void moreFlexibleStaffThanSlotsStillLeavesNothingShortAndNothingDoubleBooked() {
+            List<Availability> rows = new ArrayList<>();
+            for (DayOfWeek day : DayOfWeek.values()) {
+                for (int i = 1; i <= 10; i++) {
+                    rows.add(new Availability("flex-" + i, day, DAY));
+                    rows.add(new Availability("flex-" + i, day, NIGHT));
+                }
+            }
+
+            assertThat(ShiftCoverage.check(2, rows).fullyCovered()).isTrue();
+            // 4 floors need 8 day + 4 night = 12 people; the 10 cover the day first, then nights on floors 1 and 2
+            assertThat(ShiftCoverage.check(4, rows).uncovered())
+                    .hasSize(7 * 2)
+                    .allMatch(slot -> slot.shift() == NIGHT && slot.floor() >= 3 && slot.available() == 0);
+        }
+
+        @Test
+        void linkedListInputIsAcceptedAndValidatedByPosition() {
+            List<Availability> rows = new LinkedList<>(fullRoster(1));
+            rows.add(new Availability("late", null, DAY));
+
+            assertThat(ShiftCoverage.check(1, new LinkedList<>(fullRoster(1))).fullyCovered()).isTrue();
+            assertThatThrownBy(() -> ShiftCoverage.check(1, rows))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("row 21");
+        }
+
+        @Test
         void inputListIsNotModified() {
             List<Availability> rows = fullRoster(1);
             rows.add(new Availability("day-1", MONDAY, DAY));
@@ -198,11 +227,28 @@ class ShiftCoverageTest {
         }
 
         @ParameterizedTest(name = "{0} floors is rejected")
-        @ValueSource(ints = {0, -1})
-        void fewerThanOneFloorIsRejected(int floors) {
+        @ValueSource(ints = {0, -1, ShiftCoverage.MAX_FLOORS + 1, Integer.MAX_VALUE})
+        void floorsOutsideOneToMaxAreRejected(int floors) {
             assertThatThrownBy(() -> ShiftCoverage.check(floors, List.of()))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("floors must be at least 1");
+                    .hasMessageContaining("floors must be between 1 and " + ShiftCoverage.MAX_FLOORS);
+        }
+
+        @Test
+        void maximumFloorsWithNoStaffStillProducesAFullReport() {
+            CoverageReport report = ShiftCoverage.check(ShiftCoverage.MAX_FLOORS, List.of());
+
+            assertThat(report.uncovered()).hasSize(ShiftCoverage.MAX_FLOORS * 14)
+                    .allMatch(slot -> slot.available() == 0 && slot.required() > 0);
+        }
+
+        @Test
+        void rowWithoutShiftIsRejectedWithItsPosition() {
+            List<Availability> rows = List.of(new Availability("a", MONDAY, DAY), new Availability("b", MONDAY, null));
+
+            assertThatThrownBy(() -> ShiftCoverage.check(1, rows))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("row 1: shift");
         }
 
         @Test
@@ -224,7 +270,7 @@ class ShiftCoverageTest {
         }
 
         @ParameterizedTest(name = "staff name [{0}] is rejected")
-        @ValueSource(strings = {"", "   "})
+        @ValueSource(strings = {"", "   ", "\t\n"})
         void blankStaffNameIsRejected(String name) {
             assertThatThrownBy(() -> ShiftCoverage.check(1, List.of(new Availability(name, MONDAY, DAY))))
                     .isInstanceOf(IllegalArgumentException.class)

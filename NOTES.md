@@ -51,3 +51,6 @@ floors in ascending order, so a shortfall lands on the highest floors; report on
 - A bad row (null, blank name, missing day or shift) fails the whole check with its position, rather than being
   skipped: a roster with a hole in it is not a safe basis for a staffing answer, and the message says what to fix.
 - Per-day bucketing is name -> set of shifts, so the same person listed for both shifts counts as one flexible person.
+- Hardening: floors capped at 500 (overflow and report size), rows read through an iterator (LinkedList-safe).
+- Runner reads the problem statement's own shape (`name: days: shift; days: shift`, `floors = N`) rather than JSON,
+  so a modified input can be typed by hand during the exercise; every parse error names its line.

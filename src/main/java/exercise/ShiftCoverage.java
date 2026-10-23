@@ -17,6 +17,9 @@ public final class ShiftCoverage {
 
     private static final Logger LOG = LoggerFactory.getLogger(ShiftCoverage.class);
 
+    /** Upper bound on floors: keeps the report small and the arithmetic far from overflow. */
+    public static final int MAX_FLOORS = 500;
+
     private ShiftCoverage() {
     }
 
@@ -27,23 +30,23 @@ public final class ShiftCoverage {
      * on the day shift first, then on the night shift if the day is already covered. Staff are handed to floors in
      * ascending order, so a shortfall lands on the highest-numbered floors.
      *
-     * @param floors       number of floors to staff; at least 1
+     * @param floors       number of floors to staff; between 1 and {@link #MAX_FLOORS}
      * @param availability staff availability rows; must not be null, may be empty; duplicates count once
      * @return the report, with uncovered slots ordered Monday to Sunday, DAY before NIGHT, floor ascending
-     * @throws IllegalArgumentException if {@code floors} is below 1, the list is null, or a row is unusable
+     * @throws IllegalArgumentException if {@code floors} is out of range, the list is null, or a row is unusable
      */
     public static CoverageReport check(int floors, List<Availability> availability) {
-        if (floors < 1) {
-            throw new IllegalArgumentException("floors must be at least 1, got " + floors);
+        if (floors < 1 || floors > MAX_FLOORS) {
+            throw new IllegalArgumentException("floors must be between 1 and " + MAX_FLOORS + ", got " + floors);
         }
         if (availability == null) {
             throw new IllegalArgumentException("availability must not be null");
         }
 
         Map<DayOfWeek, Map<String, EnumSet<Shift>>> shiftsByPersonByDay = new EnumMap<>(DayOfWeek.class);
-        for (int i = 0; i < availability.size(); i++) {
-            Availability row = availability.get(i);
-            validate(row, i);
+        int index = 0;
+        for (Availability row : availability) {
+            validate(row, index++);
             shiftsByPersonByDay.computeIfAbsent(row.day(), day -> new HashMap<>())
                     .computeIfAbsent(normalizeName(row.staff()), name -> EnumSet.noneOf(Shift.class))
                     .add(row.shift());
