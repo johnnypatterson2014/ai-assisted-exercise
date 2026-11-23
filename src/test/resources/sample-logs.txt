@@ -1,0 +1,5 @@
+{"timestamp": "2025-08-05T12:00:00Z", "msg": "User login", "user": "alice"}
+{"time": "2025-08-05 12:00:01", "message": "User logged in", "username": "bob"}
+{"ts": 1691236800, "log": "LOGIN carol"}
+User John logged in
+{"log": "LOGIN dan"}

@@ -7,9 +7,11 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -17,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -27,7 +30,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public final class LogNormalizer {
 
     private static final Logger LOG = LoggerFactory.getLogger(LogNormalizer.class);
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    // Trailing content after the first JSON value fails the parse instead of being dropped silently.
+    private static final ObjectMapper MAPPER = new ObjectMapper()
+            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 
     // Field names per service, in order of precedence. A new service is one more alias.
     private static final List<String> TIME_FIELDS = List.of("timestamp", "time", "ts");
@@ -39,7 +44,12 @@ public final class LogNormalizer {
             Pattern.compile("LOGIN\\s+(\\S+)"),
             Pattern.compile("User\\s+(\\S+)\\s+logged in"));
 
-    private static final DateTimeFormatter ZONELESS = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss");
+    // Strict, so an impossible date such as 30 February fails instead of being moved to the 28th.
+    private static final DateTimeFormatter ZONELESS =
+            DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss").withResolverStyle(ResolverStyle.STRICT);
+
+    // An epoch value this large is milliseconds: read as seconds it would be past the year 5000.
+    private static final long EPOCH_MILLIS_FROM = 100_000_000_000L;
 
     private static final Comparator<Entry> BY_TIME_BLANK_LAST =
             Comparator.comparing(Entry::instant, Comparator.nullsLast(Comparator.naturalOrder()));
@@ -51,7 +61,7 @@ public final class LogNormalizer {
     public record NormalizedLog(String time, String user, String message) {
     }
 
-    /** A line that was not normalized: its position in the input and why. Never carries the raw line. */
+    /** A line that was not normalized: its zero-based position in the input and why. Never carries the raw line. */
     public record Rejection(int index, String reason) {
     }
 
@@ -59,8 +69,8 @@ public final class LogNormalizer {
     public record Result(List<NormalizedLog> logs, List<Rejection> rejected) {
     }
 
-    /** What one line offered before validation; a field is null when it is absent, null or blank. */
-    private record Fields(JsonNode time, String user, String message) {
+    /** What one line offered before validation: every time alias that has a value, then user and message. */
+    private record Fields(List<JsonNode> times, String user, String message) {
     }
 
     /** A normalized log with its parsed instant (null when unparsable), kept for sorting. */
@@ -88,7 +98,7 @@ public final class LogNormalizer {
         for (String line : lines) {
             index++;
             Fields fields = readFields(line);
-            boolean hasTime = fields.time() != null;
+            boolean hasTime = !fields.times().isEmpty();
             boolean hasUser = fields.user() != null;
             if (!hasTime || !hasUser) {
                 String reason = hasTime ? "missing user" : hasUser ? "missing time" : "missing time and user";
@@ -96,7 +106,7 @@ public final class LogNormalizer {
                 LOG.warn("rejected line at index {}: {}", index, reason);
                 continue;
             }
-            Instant instant = parseTime(fields.time());
+            Instant instant = firstParsableTime(fields.times());
             if (instant == null) {
                 unparsableTimes++;
                 LOG.warn("line at index {} has an unparsable time, kept with a blank time", index);
@@ -127,19 +137,19 @@ public final class LogNormalizer {
 
     private static Fields readFields(String line) {
         if (line == null || line.isBlank()) {
-            return new Fields(null, null, null);
+            return new Fields(List.of(), null, null);
         }
         JsonNode object = parseObject(line);
         if (object == null) {
             String text = line.strip();
-            return new Fields(null, userFromText(text), text);
+            return new Fields(List.of(), userFromText(text), text);
         }
-        String message = text(first(object, MESSAGE_FIELDS));
-        String user = text(first(object, USER_FIELDS));
+        String message = firstText(object, MESSAGE_FIELDS);
+        String user = firstText(object, USER_FIELDS);
         if (user == null) {
             user = userFromText(message);
         }
-        return new Fields(first(object, TIME_FIELDS), user, message);
+        return new Fields(values(object, TIME_FIELDS), user, message);
     }
 
     /** Returns the line as a JSON object, or null when it is plain text, an array or a scalar. */
@@ -152,19 +162,19 @@ public final class LogNormalizer {
         }
     }
 
-    /** Returns the first alias that has a value, or null; absent, null and blank all count as no value. */
-    private static JsonNode first(JsonNode object, List<String> names) {
-        for (String name : names) {
-            JsonNode value = object.get(name);
-            if (value != null && value.isValueNode() && !value.isNull() && !value.asText().isBlank()) {
-                return value;
-            }
-        }
-        return null;
+    /** Returns the aliases that have a value, in order of precedence. */
+    private static List<JsonNode> values(JsonNode object, List<String> names) {
+        return names.stream().map(object::get).filter(LogNormalizer::hasValue).toList();
     }
 
-    private static String text(JsonNode value) {
-        return value == null ? null : value.asText().strip();
+    /** Absent, JSON null, blank, and nested objects or arrays all count as no value. */
+    private static boolean hasValue(JsonNode value) {
+        return value != null && value.isValueNode() && !value.isNull() && !value.asText().isBlank();
+    }
+
+    private static String firstText(JsonNode object, List<String> names) {
+        List<JsonNode> values = values(object, names);
+        return values.isEmpty() ? null : values.get(0).asText().strip();
     }
 
     private static String userFromText(String text) {
@@ -180,11 +190,18 @@ public final class LogNormalizer {
         return null;
     }
 
+    /** Returns the first candidate that reads as a time, or null when none does. */
+    private static Instant firstParsableTime(List<JsonNode> candidates) {
+        return candidates.stream().map(LogNormalizer::parseTime).filter(Objects::nonNull).findFirst().orElse(null);
+    }
+
     /** Returns the instant, or null when the value cannot be read as a time. */
     private static Instant parseTime(JsonNode value) {
         try {
             if (value.isIntegralNumber() && value.canConvertToLong()) {
-                return Instant.ofEpochSecond(value.longValue());
+                long epoch = value.longValue();
+                boolean millis = epoch >= EPOCH_MILLIS_FROM || epoch <= -EPOCH_MILLIS_FROM;
+                return millis ? Instant.ofEpochMilli(epoch) : Instant.ofEpochSecond(epoch);
             }
             if (value.isTextual()) {
                 return parseTimeText(value.asText().strip());

@@ -1,7 +1,9 @@
 package exercise;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -216,6 +218,81 @@ class LogNormalizerTest {
 
             assertThat(result.logs()).extracting(NormalizedLog::user).containsExactly("alice");
             assertThat(result.rejected()).extracting(Rejection::index).containsExactly(0);
+        }
+    }
+
+    @Nested
+    @DisplayName("adversarial")
+    class Adversarial {
+
+        @Test
+        void impossibleDateIsNotSilentlyCorrected() {
+            Result result = normalize(
+                    "{\"time\": \"2025-02-30 12:00:00\", \"message\": \"event\", \"username\": \"bob\"}");
+
+            assertThat(result.logs()).containsExactly(new NormalizedLog("", "bob", "event"));
+        }
+
+        @Test
+        void epochMillisecondsAreNotReadAsSeconds() {
+            Result result = normalize("{\"ts\": 1691236800000, \"log\": \"LOGIN carol\"}");
+
+            assertThat(result.logs()).extracting(NormalizedLog::time).containsExactly("2023-08-05T12:00:00Z");
+        }
+
+        @ParameterizedTest(name = "trailing [{0}] rejects the line")
+        @ValueSource(strings = {"garbage", "{\"user\": \"mallory\"}"})
+        void trailingContentAfterTheJsonObjectRejectsTheLine(String trailing) {
+            Result result = normalize(SERVICE_A + " " + trailing);
+
+            assertThat(result.logs()).isEmpty();
+            assertThat(result.rejected()).extracting(Rejection::index).containsExactly(0);
+        }
+
+        @Test
+        void aValidTimeAliasIsUsedWhenAnEarlierOneIsUnparsable() {
+            Result result = normalize(
+                    "{\"timestamp\": \"not a date\", \"time\": \"2025-08-05 12:00:01\", \"user\": \"alice\"}");
+
+            assertThat(result.logs()).extracting(NormalizedLog::time).containsExactly("2025-08-05T12:00:01Z");
+        }
+
+        @Test
+        void timestampWinsWhenTwoTimeAliasesAreBothValid() {
+            Result result = normalize(
+                    "{\"time\": \"2025-08-05 12:00:01\", \"timestamp\": \"2024-01-01T00:00:00Z\", \"user\": \"alice\"}");
+
+            assertThat(result.logs()).extracting(NormalizedLog::time).containsExactly("2024-01-01T00:00:00Z");
+        }
+
+        @ParameterizedTest(name = "ts {0} gives time [{1}]")
+        @CsvSource({"0,1970-01-01T00:00:00Z", "99999999999999999999,''"})
+        void epochBoundariesNeverThrow(String ts, String expectedTime) {
+            Result result = normalize("{\"ts\": %s, \"log\": \"LOGIN carol\"}".formatted(ts));
+
+            assertThat(result.logs()).extracting(NormalizedLog::time).containsExactly(expectedTime);
+        }
+
+        @Test
+        void resultIsImmutableAndTheInputIsLeftAsGiven() {
+            List<String> input = new ArrayList<>(List.of(SERVICE_B, SERVICE_A));
+
+            Result result = LogNormalizer.normalize(input);
+
+            assertThat(input).containsExactly(SERVICE_B, SERVICE_A);
+            assertThatThrownBy(() -> result.logs().add(new NormalizedLog("", "eve", null)))
+                    .isInstanceOf(UnsupportedOperationException.class);
+            assertThatThrownBy(() -> result.rejected().add(new Rejection(9, "forged")))
+                    .isInstanceOf(UnsupportedOperationException.class);
+        }
+
+        @Test
+        void nearMissOfATextPatternIsRejectedWithoutLeakingTheUser() {
+            Result result = normalize("LOGIN carol from 10.0.0.1");
+
+            assertThat(result.logs()).isEmpty();
+            assertThat(result.rejected()).extracting(Rejection::reason).singleElement().asString()
+                    .doesNotContain("carol");
         }
     }
 }

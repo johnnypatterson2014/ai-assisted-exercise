@@ -60,3 +60,10 @@ The given `String LogNormalizer(List<String>)` stays as a thin wrapper that rend
   So a blank time is a reject (missing), while `"not a date"` is kept with a blank time (unparsable).
 - A `ts` that is a decimal or a quoted number is unparsable, not guessed at; only whole epoch seconds are read.
 - `normalizeToJson` replaces the starter's `LogNormalizer(...)` method name, which read like a constructor.
+- Phase 4 fixes from the review: dates are parsed strictly (30 February is unparsable, not moved to the 28th);
+  trailing content after a JSON object makes the line plain text, so it is rejected instead of half-read;
+  when one time alias is unparsable the next alias is tried before giving up.
+- My assumption, not the interviewer's: an epoch value of 1e11 or more is milliseconds. Read as seconds it
+  would be past the year 5000; the cost is that millisecond values before March 1973 are misread as seconds.
+- `Runner` prints the whole `Result` (logs and rejections), not only the logs array, so a modified input file
+  shows why a line was dropped.

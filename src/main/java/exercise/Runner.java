@@ -17,13 +17,13 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
  * Usage (Maven supplies the dependency classpath; a plain {@code java -cp target/classes} would miss Jackson
  * and SLF4J):
  * <pre>
- *   mvn -q compile exec:java -Dexec.args="src/test/resources/sample-input.txt"
+ *   mvn -q compile exec:java -Dexec.args="src/test/resources/sample-logs.txt"
  *   echo "one line" | mvn -q compile exec:java -Dexec.args="-"
  * </pre>
  * In STS: right-click Runner, Run As, Java Application, with the file path under Run Configurations, Arguments.
  *
- * Replace the body of {@link #run(List)} when the real exercise is known: parse the lines (text, CSV or JSON)
- * into the input type and call the solution. {@link #MAPPER} is ready for JSON with java.time types.
+ * Each input line is one raw log entry, a JSON object or plain text. The output is the normalized logs ordered
+ * by time and the rejected lines (zero-based line position and reason), as JSON.
  */
 public final class Runner {
 
@@ -46,9 +46,8 @@ public final class Runner {
         System.out.println(run(lines));
     }
 
-    /** Runs the solution on raw input lines and renders the result as JSON. */
+    /** Normalizes the raw log lines and renders the logs and the rejections as JSON. */
     static String run(List<String> lines) throws IOException {
-        Placeholder.Summary summary = Placeholder.summarize(lines);
-        return MAPPER.writeValueAsString(summary);
+        return MAPPER.writeValueAsString(LogNormalizer.normalize(lines));
     }
 }
