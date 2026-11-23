@@ -67,3 +67,34 @@ The given `String LogNormalizer(List<String>)` stays as a thin wrapper that rend
   would be past the year 5000; the cost is that millisecond values before March 1973 are misread as seconds.
 - `Runner` prints the whole `Result` (logs and rejections), not only the logs array, so a modified input file
   shows why a line was dropped.
+
+## Coverage after phase 4 (JaCoCo 0.8.12, 47 tests, all green)
+
+Command: `mvn -q org.jacoco:jacoco-maven-plugin:0.8.12:prepare-agent test org.jacoco:jacoco-maven-plugin:0.8.12:report`
+Report: `target/site/jacoco/index.html` (per class under `target/site/jacoco/exercise/`).
+
+| Class | Lines covered | Lines | Branches covered | Branches |
+|---|---|---|---|---|
+| LogNormalizer (with its five records) | 84 of 87 | 96.6% | 55 of 60 | 91.7% |
+| Runner (`run` and the mapper setup) | 0 of 5 | 0% | 0 of 0 | n/a |
+| **Total** | **84 of 92** | **91.3%** | **55 of 60** | **91.7%** |
+
+`Placeholder` is the template's example class and `Runner.main` is run by hand from the terminal, so both are left out.
+
+Not covered, and why:
+
+- `LogNormalizer` lines 133-134: the `catch` in `normalizeToJson`. Records of strings always serialize, so this is
+  defensive and not reachable through the public API; a test would need a mapper that can be made to fail.
+- `LogNormalizer` line 159, 1 of 4 branches: `node != null` is never false, because `readTree` returns a node for
+  any non-blank text. Defensive; no input reaches it.
+- `LogNormalizer` line 172, 2 of 8 branches: no test has a field whose value is JSON null or a nested object.
+  Closed by `jsonNullUserCountsAsMissing` and `structuredMessageBecomesNull`.
+- `LogNormalizer` lines 181-182: `userFromText(null)`, a JSON object with a time but no user and no message.
+  Closed by `jsonWithOnlyATimeIsRejectedForAMissingUser`.
+- `LogNormalizer` line 203, 1 of 4 branches: a negative epoch in milliseconds.
+  Closed by `negativeEpochMillisecondsAreReadAsMilliseconds`.
+- `Runner` lines 30-33 and 51: nothing calls `Runner.run`. Closed by a `RunnerTest` that feeds the five sample
+  lines to `run` and checks three logs and two rejections in the JSON.
+
+Takeaway: the normalizer's real gaps are three small input shapes and a Runner test; the remaining misses are
+defensive branches that no input can reach.
