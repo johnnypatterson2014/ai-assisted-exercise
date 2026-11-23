@@ -56,3 +56,7 @@ The given `String LogNormalizer(List<String>)` stays as a thin wrapper that rend
 
 - `time` is a `String` in the record, not an `Instant`, because an unparsable date must come out as a blank string.
   Sorting uses the parsed instant, not the text (ISO text with fractional seconds does not sort chronologically).
+- One rule for "missing": a field that is absent, JSON null or blank has no value, and the next alias is tried.
+  So a blank time is a reject (missing), while `"not a date"` is kept with a blank time (unparsable).
+- A `ts` that is a decimal or a quoted number is unparsable, not guessed at; only whole epoch seconds are read.
+- `normalizeToJson` replaces the starter's `LogNormalizer(...)` method name, which read like a constructor.
